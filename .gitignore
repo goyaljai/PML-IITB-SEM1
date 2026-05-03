@@ -1,0 +1,2 @@
+.DS_Store
+EOF && git add -A && git commit -m "Keep only dataset and .gitignore"

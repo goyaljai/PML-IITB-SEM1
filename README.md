@@ -25,6 +25,15 @@ size_categories:
 | Dimensions | 800 × 600 px (all uniform) |
 | Size | ~141 MB |
 
+### Train / Test Split
+
+| Split | Folder | Count | % |
+|---|---|---|---|
+| Train | `train/` | 674 | 70% |
+| Test | `test/` | 289 | 30% |
+
+> Split is random with `seed=42` for reproducibility.
+
 ### Source breakdown
 | Source | Count |
 |---|---|
@@ -42,20 +51,26 @@ size_categories:
 ```python
 from huggingface_hub import snapshot_download
 from pathlib import Path
-from PIL import Image
-import numpy as np
 
-# Download dataset
-dataset_dir = snapshot_download(repo_id="goyaljai/IITB-PML-SEM1", repo_type="dataset")
-image_paths = sorted(Path(dataset_dir).rglob("*.jpg"))
-print(f"Loaded {len(image_paths)} images")
+# Download full dataset
+dataset_dir = Path(snapshot_download(repo_id="goyaljai/IITB-PML-SEM1", repo_type="dataset"))
+
+# Train and test paths
+train_dir = dataset_dir / "train"
+test_dir  = dataset_dir / "test"
+
+train_images = sorted(train_dir.glob("*.jpg"))
+test_images  = sorted(test_dir.glob("*.jpg"))
+
+print(f"Train: {len(train_images)} images")
+print(f"Test : {len(test_images)} images")
 ```
 
 ---
 
-## Example: K-Means Clustering
+## Example: K-Means Clustering on Train Set, Evaluate on Test Set
 
-Cluster the IPL images into N groups based on colour histogram features.
+Cluster IPL images by colour histogram features. Fit KMeans on the train split, then assign test images to the nearest cluster.
 
 ```python
 from huggingface_hub import snapshot_download
@@ -68,44 +83,62 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
 # ── 1. Download dataset ──────────────────────────────────────────────────────
-dataset_dir = snapshot_download(repo_id="goyaljai/IITB-PML-SEM1", repo_type="dataset")
-image_paths = sorted(Path(dataset_dir).rglob("*.jpg"))
-print(f"Found {len(image_paths)} images")
+dataset_dir = Path(snapshot_download(repo_id="goyaljai/IITB-PML-SEM1", repo_type="dataset"))
+train_images = sorted((dataset_dir / "train").glob("*.jpg"))
+test_images  = sorted((dataset_dir / "test").glob("*.jpg"))
+print(f"Train: {len(train_images)} | Test: {len(test_images)}")
 
-# ── 2. Extract colour histogram features ────────────────────────────────────
+# ── 2. Feature extraction (colour histogram) ─────────────────────────────────
 def extract_histogram(path, bins=32):
     img = Image.open(path).convert("RGB")
     arr = np.array(img)
     hist = []
-    for channel in range(3):  # R, G, B
-        h, _ = np.histogram(arr[:, :, channel], bins=bins, range=(0, 256))
+    for ch in range(3):
+        h, _ = np.histogram(arr[:, :, ch], bins=bins, range=(0, 256))
         hist.extend(h)
     return np.array(hist, dtype=float)
 
-features = np.array([extract_histogram(p) for p in image_paths])
-features = normalize(features)  # L2 normalise
-print(f"Feature matrix: {features.shape}")
+print("Extracting train features...")
+X_train = normalize(np.array([extract_histogram(p) for p in train_images]))
 
-# ── 3. K-Means clustering ────────────────────────────────────────────────────
+print("Extracting test features...")
+X_test  = normalize(np.array([extract_histogram(p) for p in test_images]))
+
+# ── 3. Fit KMeans on train ───────────────────────────────────────────────────
 N_CLUSTERS = 8
 kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=42, n_init=10)
-labels = kmeans.fit_predict(features)
+train_labels = kmeans.fit_predict(X_train)
+
+print("\nTrain cluster distribution:")
+for k in range(N_CLUSTERS):
+    print(f"  Cluster {k}: {np.sum(train_labels == k)} images")
+
+# ── 4. Predict on test ───────────────────────────────────────────────────────
+test_labels = kmeans.predict(X_test)
+
+print("\nTest cluster distribution:")
+for k in range(N_CLUSTERS):
+    print(f"  Cluster {k}: {np.sum(test_labels == k)} images")
+
+# ── 5. Visualise 5 train samples + 2 test samples per cluster ───────────────
+COLS = 7  # 5 train + 2 test
+fig, axes = plt.subplots(N_CLUSTERS, COLS, figsize=(COLS * 3, N_CLUSTERS * 2.5))
 
 for k in range(N_CLUSTERS):
-    count = np.sum(labels == k)
-    print(f"Cluster {k}: {count} images")
+    tr_paths = [p for p, l in zip(train_images, train_labels) if l == k][:5]
+    te_paths = [p for p, l in zip(test_images,  test_labels)  if l == k][:2]
+    row_paths = tr_paths + te_paths
+    for j in range(COLS):
+        ax = axes[k][j]
+        if j < len(row_paths):
+            ax.imshow(mpimg.imread(row_paths[j]))
+            if j == 0:
+                ax.set_title(f"Cluster {k}", fontsize=9)
+            if j == 5:
+                ax.set_title("TEST →", fontsize=8, color="orange")
+        ax.axis("off")
 
-# ── 4. Visualise 5 samples per cluster ──────────────────────────────────────
-fig, axes = plt.subplots(N_CLUSTERS, 5, figsize=(15, N_CLUSTERS * 3))
-for k in range(N_CLUSTERS):
-    cluster_paths = [p for p, l in zip(image_paths, labels) if l == k]
-    samples = cluster_paths[:5]
-    for j, path in enumerate(samples):
-        axes[k][j].imshow(mpimg.imread(path))
-        axes[k][j].axis("off")
-        if j == 0:
-            axes[k][j].set_title(f"Cluster {k}", fontsize=10)
-
+plt.suptitle("KMeans Clusters  |  cols 1-5: train   cols 6-7: test", fontsize=11)
 plt.tight_layout()
 plt.savefig("kmeans_clusters.png", dpi=100)
 plt.show()
@@ -113,9 +146,9 @@ print("Saved kmeans_clusters.png")
 ```
 
 ### Tips
-- Increase `N_CLUSTERS` (try 10–20) for finer-grained groupings (team kits, ground types, crowd shots)
+- Increase `N_CLUSTERS` (try 10–20) for finer groupings (team kits, ground types, crowd shots)
 - Swap colour histograms for CNN embeddings (`torchvision` ResNet) for semantic clustering
-- Use `KMeans(init='k-means++')` (default) for faster convergence
+- Use `inertia_` and elbow method to pick the optimal K
 
 ---
 

@@ -22,15 +22,6 @@
 
 > Split is random with `seed=42` for reproducibility.
 
-### Source breakdown
-| Source | Count |
-|---|---|
-| FINAL_VERIFIED_IPL_2 | 277 |
-| FINAL_VERIFIED_IPL_686 | 686 |
-
-### Processing pipeline
-- **4:3 images (915):** direct resize to 800×600 via Lanczos — full frame preserved
-- **Non-4:3 images (48):** scale-to-cover + centre crop to 800×600
 
 ---
 

@@ -1,17 +1,3 @@
----
-license: cc-by-4.0
-task_categories:
-  - image-classification
-  - image-feature-extraction
-tags:
-  - ipl
-  - cricket
-  - sports
-  - image-dataset
-size_categories:
-  - n<1K
----
-
 # IITB PML Semester 1 — IPL Image Dataset
 
 963 IPL cricket images, uniformly processed to **800 × 600 px JPEG**, prepared for the Practical Machine Learning course, Semester 1, IIT Bombay.

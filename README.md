@@ -1,5 +1,7 @@
 # IITB PML Semester 1 — IPL Image Dataset
 
+> **Dataset on Hugging Face:** [goyaljai/IITB-PML-SEM1](https://huggingface.co/datasets/goyaljai/IITB-PML-SEM1)
+
 963 IPL cricket images, uniformly processed to **800 × 600 px JPEG**, prepared for the Practical Machine Learning course, Semester 1, IIT Bombay.
 
 ## Dataset Details

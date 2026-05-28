@@ -6,7 +6,7 @@ This document covers what we're labelling, the annotation rules, the tool we bui
 
 ## What We're Labelling
 
-Each of the 1000 IPL broadcast images is divided into an **8×8 grid** (64 cells, each 100×75 px). Every cell gets one of 11 labels:
+Each of the 1005 IPL broadcast images is divided into an **8×8 grid** (64 cells, each 100×75 px). Every cell gets one of 11 labels:
 
 | Label | Team |
 |---|---|
@@ -28,13 +28,13 @@ The goal is cell-level team identification — not just "which teams are in this
 
 ## Dataset
 
-- **Total images:** 1000 (963 game images + 37 no-player images)
+- **Total images:** 1005 (968 game images + 37 no-player images)
 - **Image size:** 800 × 600 px JPEG (uniform)
-- **Train/test split:** 788 train / 212 test (pre-assigned, preserved through all renames)
-- **Naming:** `img_1.jpg` – `img_1000.jpg`
+- **Train/test split:** 793 train / 212 test (pre-assigned, preserved through all renames)
+- **Naming:** `img_1.jpg` – `img_1005.jpg`
   - `img_1` – `img_250`: game images batch 1
   - `img_251` – `img_287`: no-player images (crowd / scoreboard / venue)
-  - `img_288` – `img_1000`: game images batch 2
+  - `img_288` – `img_1005`: game images batch 2
 
 ---
 
@@ -57,7 +57,7 @@ The goal is cell-level team identification — not just "which teams are in this
 | sharon | sharon | admin |
 | rishabh | rishabh | admin |
 | ashutosh | ashutosh | admin |
-| udit | udit | admin |
+| jai1 | jai1 | admin |
 
 Each image is locked to one annotator at a time. Any admin can force-unlock a stuck image. Admins can also overwrite any annotation.
 
@@ -70,7 +70,7 @@ A custom web tool was built for this task: **http://35.207.192.90:8001**
 ### How to Use
 
 1. Log in with your credentials
-2. The sidebar lists all 1000 images — green = done, white = pending, yellow padlock = locked by someone else
+2. The sidebar lists all 1005 images — green = done, white = pending, yellow padlock = locked by someone else
 3. Press **Tab** to jump to the next pending image
 4. Select a team from the toolbar or use keyboard shortcuts
 5. Click or drag cells on the grid to paint labels
@@ -123,7 +123,7 @@ tmux new-session -d -s ipl 'cd /opt/ipl-annotator/backend && python3 -m uvicorn 
 
 ## Feature Extraction
 
-Once all 1000 images are annotated, click **⚗ Features** in the toolbar. This runs a background job (~20–30 min) that:
+Once all 1005 images are annotated, click **⚗ Features** in the toolbar. This runs a background job (~20–30 min) that:
 
 1. Reads all annotations from the DB
 2. Opens each image, crops all 64 cells
@@ -148,8 +148,8 @@ lbp_0..9
 
 **⬇ CSV** — flat annotation table, one row per image:
 ```
-Image File Name, Train Or Test, c01, c02, ..., c64
-img_1.jpg, Train, 0, 0, 6, 6, 6, 0, 0, 0, ...
+Image File Name, Train Or Test, count, c01, c02, ..., c64
+img_1.jpg, Train, 3, 0, 0, 6, 6, 6, 0, 0, 0, ...
 ```
 
 **⬇ JSON** — structured with full label matrix:

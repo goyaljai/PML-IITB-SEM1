@@ -81,6 +81,22 @@ grid = [[int(row[f'c{r*8+c+1:02d}']) for c in range(8)] for r in range(8)]
 print(grid)
 ```
 
+Or load directly into a DataFrame using the Kaggle Pandas adapter:
+
+```python
+# pip install kagglehub[pandas-datasets]
+import kagglehub
+from kagglehub import KaggleDatasetAdapter
+
+df = kagglehub.load_dataset(
+  KaggleDatasetAdapter.PANDAS,
+  "goyaljai0207/ipl-player-detection-iitb-pml",
+  "",  # empty string loads annotations.csv by default
+)
+
+print("First 5 records:", df.head())
+```
+
 ---
 
 ## Example: Team Classification with Annotations

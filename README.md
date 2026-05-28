@@ -1,138 +1,139 @@
-# IITB PML Semester 1 — IPL Image Dataset
+# IITB PML Semester 1 — IPL Player Detection Dataset
 
-> **Dataset on Hugging Face:** [goyaljai/IITB-PML-SEM1](https://huggingface.co/datasets/goyaljai/IITB-PML-SEM1)
+> **Kaggle:** [goyaljai0207/ipl-player-detection-iitb-pml](https://www.kaggle.com/datasets/goyaljai0207/ipl-player-detection-iitb-pml)
+> **HuggingFace:** [goyaljai/IITB-PML-SEM1](https://huggingface.co/datasets/goyaljai/IITB-PML-SEM1)
 
-963 IPL cricket images, uniformly processed to **800 × 600 px JPEG**, prepared for the Practical Machine Learning course, Semester 1, IIT Bombay.
+1000 IPL cricket broadcast images annotated with **8×8 grid team labels** and **player counts**, prepared for the Practical Machine Learning course, Semester 1, IIT Bombay.
+
+**Keywords:** IPL dataset, cricket player detection, IPL team classification, cricket image dataset, broadcast frame annotation, player count dataset, cricket computer vision, sports detection dataset, IITB machine learning, cricket jersey detection, multi-label cricket dataset, IPL 2024 dataset
 
 ## Dataset Details
 
 | Property | Value |
 |---|---|
-| Total images | 963 |
+| Total images | 1000 |
 | Format | JPEG |
 | Dimensions | 800 × 600 px (all uniform) |
-| Size | ~141 MB |
+| Annotation | 8×8 grid cell labels + player count |
+| Teams | 10 IPL teams (CSK, DC, GT, KKR, LSG, MI, PBKS, RR, RCB, SRH) |
 
 ### Train / Test Split
 
-| Split | Folder | Count | % |
-|---|---|---|---|
-| Train | `train/` | 674 | 70% |
-| Test | `test/` | 289 | 30% |
+| Split | Folder | Count |
+|---|---|---|
+| Train | `train/` | 788 |
+| Test | `test/` | 212 |
 
-> Split is random with `seed=42` for reproducibility.
+### Label Schema (`annotations.csv`)
 
+| Column | Description |
+|--------|-------------|
+| `Image File Name` | `img_NNN.jpg` |
+| `Train Or Test` | `Train` or `Test` |
+| `count` | Total players visible in image (0–20) |
+| `c01`–`c64` | Team ID per grid cell (row-major, 8 cols/row) |
+
+**Team IDs:** 0=empty, 1=CSK, 2=DC, 3=GT, 4=KKR, 5=LSG, 6=MI, 7=PBKS, 8=RR, 9=RCB, 10=SRH
 
 ---
 
-## How to Load
+## How to Load (HuggingFace)
 
 ```python
 from huggingface_hub import snapshot_download
 from pathlib import Path
+import pandas as pd
 
-# Download full dataset
 dataset_dir = Path(snapshot_download(repo_id="goyaljai/IITB-PML-SEM1", repo_type="dataset"))
 
-# Train and test paths
-train_dir = dataset_dir / "train"
-test_dir  = dataset_dir / "test"
-
-train_images = sorted(train_dir.glob("*.jpg"))
-test_images  = sorted(test_dir.glob("*.jpg"))
-
-print(f"Train: {len(train_images)} images")
-print(f"Test : {len(test_images)} images")
-```
-
----
-
-## Example: K-Means Clustering on Train Set, Evaluate on Test Set
-
-Cluster IPL images by colour histogram features. Fit KMeans on the train split, then assign test images to the nearest cluster.
-
-```python
-from huggingface_hub import snapshot_download
-from pathlib import Path
-from PIL import Image
-import numpy as np
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import normalize
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-
-# ── 1. Download dataset ──────────────────────────────────────────────────────
-dataset_dir = Path(snapshot_download(repo_id="goyaljai/IITB-PML-SEM1", repo_type="dataset"))
 train_images = sorted((dataset_dir / "train").glob("*.jpg"))
 test_images  = sorted((dataset_dir / "test").glob("*.jpg"))
+annotations  = pd.read_csv(dataset_dir / "annotations.csv")
+
 print(f"Train: {len(train_images)} | Test: {len(test_images)}")
-
-# ── 2. Feature extraction (colour histogram) ─────────────────────────────────
-def extract_histogram(path, bins=32):
-    img = Image.open(path).convert("RGB")
-    arr = np.array(img)
-    hist = []
-    for ch in range(3):
-        h, _ = np.histogram(arr[:, :, ch], bins=bins, range=(0, 256))
-        hist.extend(h)
-    return np.array(hist, dtype=float)
-
-print("Extracting train features...")
-X_train = normalize(np.array([extract_histogram(p) for p in train_images]))
-
-print("Extracting test features...")
-X_test  = normalize(np.array([extract_histogram(p) for p in test_images]))
-
-# ── 3. Fit KMeans on train ───────────────────────────────────────────────────
-N_CLUSTERS = 8
-kmeans = KMeans(n_clusters=N_CLUSTERS, random_state=42, n_init=10)
-train_labels = kmeans.fit_predict(X_train)
-
-print("\nTrain cluster distribution:")
-for k in range(N_CLUSTERS):
-    print(f"  Cluster {k}: {np.sum(train_labels == k)} images")
-
-# ── 4. Predict on test ───────────────────────────────────────────────────────
-test_labels = kmeans.predict(X_test)
-
-print("\nTest cluster distribution:")
-for k in range(N_CLUSTERS):
-    print(f"  Cluster {k}: {np.sum(test_labels == k)} images")
-
-# ── 5. Visualise 5 train samples + 2 test samples per cluster ───────────────
-COLS = 7  # 5 train + 2 test
-fig, axes = plt.subplots(N_CLUSTERS, COLS, figsize=(COLS * 3, N_CLUSTERS * 2.5))
-
-for k in range(N_CLUSTERS):
-    tr_paths = [p for p, l in zip(train_images, train_labels) if l == k][:5]
-    te_paths = [p for p, l in zip(test_images,  test_labels)  if l == k][:2]
-    row_paths = tr_paths + te_paths
-    for j in range(COLS):
-        ax = axes[k][j]
-        if j < len(row_paths):
-            ax.imshow(mpimg.imread(row_paths[j]))
-            if j == 0:
-                ax.set_title(f"Cluster {k}", fontsize=9)
-            if j == 5:
-                ax.set_title("TEST →", fontsize=8, color="orange")
-        ax.axis("off")
-
-plt.suptitle("KMeans Clusters  |  cols 1-5: train   cols 6-7: test", fontsize=11)
-plt.tight_layout()
-plt.savefig("kmeans_clusters.png", dpi=100)
-plt.show()
-print("Saved kmeans_clusters.png")
+print(annotations.head())
 ```
 
-### Tips
-- Increase `N_CLUSTERS` (try 10–20) for finer groupings (team kits, ground types, crowd shots)
-- Swap colour histograms for CNN embeddings (`torchvision` ResNet) for semantic clustering
-- Use `inertia_` and elbow method to pick the optimal K
+---
+
+## How to Load (Kaggle)
+
+```python
+import kagglehub
+import pandas as pd
+from pathlib import Path
+from PIL import Image
+
+# Download dataset
+path = kagglehub.dataset_download("goyaljai0207/ipl-player-detection-iitb-pml")
+
+# Load annotations
+df = pd.read_csv(f"{path}/annotations.csv")
+print(df.head())
+
+# Load an image
+img = Image.open(f"{path}/train/img_1.jpg")
+img.show()
+
+# Get 8x8 label grid for first image
+row = df.iloc[0]
+grid = [[int(row[f'c{r*8+c+1:02d}']) for c in range(8)] for r in range(8)]
+print(grid)
+```
+
+---
+
+## Example: Team Classification with Annotations
+
+```python
+import kagglehub, pandas as pd, numpy as np
+from pathlib import Path
+from PIL import Image
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+
+path = kagglehub.dataset_download("goyaljai0207/ipl-player-detection-iitb-pml")
+df = pd.read_csv(f"{path}/annotations.csv")
+
+TEAMS = {0:'empty',1:'CSK',2:'DC',3:'GT',4:'KKR',5:'LSG',6:'MI',7:'PBKS',8:'RR',9:'RCB',10:'SRH'}
+
+def extract_histogram(img_path, bins=32):
+    img = Image.open(img_path).convert("RGB")
+    arr = np.array(img)
+    return np.concatenate([np.histogram(arr[:,:,c], bins=bins, range=(0,256))[0] for c in range(3)])
+
+train_df = df[df['Train Or Test'] == 'Train']
+test_df  = df[df['Train Or Test'] == 'Test']
+
+X_train = np.array([extract_histogram(f"{path}/train/{r['Image File Name']}") for _, r in train_df.iterrows()])
+X_test  = np.array([extract_histogram(f"{path}/test/{r['Image File Name']}") for _, r in test_df.iterrows()])
+
+# Predict dominant team per image
+y_train = [TEAMS[max(set([r[f'c{i:02d}'] for i in range(1,65)]), key=lambda x: [r[f'c{i:02d}'] for i in range(1,65)].count(x))] for _, r in train_df.iterrows()]
+y_test  = [TEAMS[max(set([r[f'c{i:02d}'] for i in range(1,65)]), key=lambda x: [r[f'c{i:02d}'] for i in range(1,65)].count(x))] for _, r in test_df.iterrows()]
+
+clf = RandomForestClassifier(n_estimators=100, random_state=42)
+clf.fit(X_train, y_train)
+print(classification_report(y_test, clf.predict(X_test)))
+```
 
 ---
 
 ## Requirements
 
 ```
-pip install huggingface_hub pillow scikit-learn matplotlib numpy
+pip install huggingface_hub kagglehub pillow scikit-learn pandas numpy matplotlib
+```
+
+---
+
+## Citation
+
+```
+@dataset{ipl_player_detection_2026,
+  title   = {IPL Player Detection Dataset — IITB PML Sem1},
+  author  = {Goyal, Jai and contributors},
+  year    = {2026},
+  url     = {https://www.kaggle.com/datasets/goyaljai0207/ipl-player-detection-iitb-pml}
+}
 ```

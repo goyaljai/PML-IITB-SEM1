@@ -1,112 +1,51 @@
 # IPL Grid Annotation — Labelling Setup & Process
 
-This document describes the annotation infrastructure built for the IITB PML Sem1 project, how it works, and how to use it.
+This document covers what we're labelling, the annotation rules, the tool we built, and the infrastructure behind it.
 
 ---
 
-## Overview
+## What We're Labelling
 
-We needed to label **1000 IPL cricket broadcast images** at a fine-grained level — not just "which teams are playing" but **which cells of an 8×8 grid contain players from which team**. Each image is divided into a 64-cell grid (8 rows × 8 columns, each cell 100×75 px), and every cell gets an integer label:
+Each of the 1000 IPL broadcast images is divided into an **8×8 grid** (64 cells, each 100×75 px). Every cell gets one of 11 labels:
 
 | Label | Team |
 |---|---|
 | 0 | Empty / No player |
-| 1 | CSK |
-| 2 | DC |
-| 3 | GT |
-| 4 | KKR |
-| 5 | LSG |
-| 6 | MI |
-| 7 | PBKS |
-| 8 | RR |
-| 9 | RCB |
-| 10 | SRH |
+| 1 | CSK — Chennai Super Kings |
+| 2 | DC — Delhi Capitals |
+| 3 | GT — Gujarat Titans |
+| 4 | KKR — Kolkata Knight Riders |
+| 5 | LSG — Lucknow Super Giants |
+| 6 | MI — Mumbai Indians |
+| 7 | PBKS — Punjab Kings |
+| 8 | RR — Rajasthan Royals |
+| 9 | RCB — Royal Challengers Bangalore |
+| 10 | SRH — Sunrisers Hyderabad |
 
-This gives us a **64-label annotation per image**, which will be used downstream to extract per-cell features (HSV histograms, colour moments, HOG descriptors, LBP texture) for a supervised classification model.
+The goal is cell-level team identification — not just "which teams are in this image" but **exactly which cells contain players from which team**. These 64 labels per image feed into per-cell feature extraction (HSV, colour moments, HOG, LBP) for a supervised classification model.
 
 ---
 
 ## Dataset
 
-- **Total images:** 1000 (963 original game images + 37 "no-player" images)
-- **Image size:** 800 × 600 px JPEG (all uniform)
-- **Train/test split:** 788 train / 212 test (pre-assigned, not touched during renaming)
-- **Naming convention:** `img_1.jpg` through `img_1000.jpg`
-  - `img_1` – `img_250`: original game images (first batch)
-  - `img_251` – `img_287`: the 37 no-player images (inserted in the middle)
-  - `img_288` – `img_1000`: original game images (second batch)
-
-The no-player images were originally named with a `np_` prefix. They were renumbered into the middle of the sequence intentionally so the index range stays clean while keeping them identifiable by position. The `split` column (train/test) in the database was preserved through the rename.
+- **Total images:** 1000 (963 game images + 37 no-player images)
+- **Image size:** 800 × 600 px JPEG (uniform)
+- **Train/test split:** 788 train / 212 test (pre-assigned, preserved through all renames)
+- **Naming:** `img_1.jpg` – `img_1000.jpg`
+  - `img_1` – `img_250`: game images batch 1
+  - `img_251` – `img_287`: no-player images (crowd / scoreboard / venue)
+  - `img_288` – `img_1000`: game images batch 2
 
 ---
 
-## Annotation Tool
+## Annotation Rules
 
-A custom web-based annotation tool was built from scratch for this project. It runs as a FastAPI backend + React/Vite frontend.
-
-### Architecture
-
-```
-browser  ──→  React frontend (Vite)
-               └─ served from /opt/ipl-annotator/frontend/dist (production)
-                  or localhost:5173 (dev)
-
-               ──→  FastAPI backend (port 8001)
-                       ├─ SQLite DB (annotator.db)
-                       │     ├─ users table
-                       │     ├─ images table (filename, split, status, lock state)
-                       │     └─ annotations table (image_id, annotator, labels JSON, updated_at)
-                       └─ Images on disk (/opt/ipl-annotator/images/)
-```
-
-### Key Features
-
-**Grid painting interface**
-Click or drag across the 8×8 overlay to paint team labels onto cells. The grid is rendered as a canvas overlay on top of the actual image. Each team has a distinct colour and a keyboard shortcut (keys 1–9 for CSK–RCB, key `0` for SRH which has label 10).
-
-**Real-time autosave**
-Every paint action triggers a debounced save (800ms). The backend receives the full 8×8 label matrix and upserts it. The frontend shows a live save badge (Unsaved → Saving → Saved).
-
-**Collaborative locking**
-Multiple annotators work simultaneously. When a user opens an image, it gets locked to them for 3 minutes. The lock auto-refreshes via a heartbeat every 30 seconds. Other users see the image as locked in the sidebar. Locks expire automatically if the user closes the tab without unlocking.
-
-**Fast navigation**
-- Arrow keys / Space: previous/next image
-- Tab: jump to the next unannotated (pending) image
-- Keyboard shortcuts for all team labels
-
-**Undo/Redo**
-Full undo/redo history (up to 30 states) stored in the frontend — Ctrl+Z / Ctrl+Shift+Z. Undo/redo also triggers autosave.
-
-**Live sidebar**
-The image list polls every 3 seconds and updates each image's status (pending/done), who annotated it, and who currently has it locked.
-
-**Admin controls**
-All 5 annotators have admin role. Admins can:
-- Force-unlock any image stuck under another user's lock
-- Overwrite any annotation (other users can only edit their own)
-- Export annotations as CSV or JSON
-- Trigger feature extraction (see below)
-
-**Progress counter**
-Top bar shows: `annotated / total done · mine mine`. Updates in real time.
-
----
-
-## Infrastructure
-
-The tool is deployed on a GCP VM (`aosp-build-vm-3`, zone `asia-south1-a`).
-
-- **URL:** http://35.207.192.90:8001
-- **Backend:** uvicorn with 4 workers, running inside a `tmux` session named `ipl`
-- **Database:** SQLite at `/opt/ipl-annotator/backend/annotator.db` (WAL mode for concurrent reads)
-- **Images:** `/opt/ipl-annotator/images/`
-- **Firewall:** GCP VPC rule `ipl-annotator` on `glancecdn-sandbox-main-vpc` allowing TCP:8001
-
-To restart the server after a VM reboot:
-```bash
-tmux new-session -d -s ipl 'cd /opt/ipl-annotator/backend && python3 -m uvicorn main:app --host 0.0.0.0 --port 8001 --workers 4'
-```
+1. **Paint every cell with a visible player** using that player's team label
+2. **Leave empty cells at 0** — grass, crowd, scoreboard, watermarks, umpires, support staff
+3. **Partial visibility counts** — if the jersey is identifiable, label it
+4. **Ambiguous cells** — if you genuinely cannot tell, leave as 0
+5. **Both teams on screen** — label each cell with whichever team's player occupies it (both teams can appear in the same image)
+6. **No-player images (img_251–img_287)** — leave all 64 cells at 0, move on immediately
 
 ---
 
@@ -120,83 +59,105 @@ tmux new-session -d -s ipl 'cd /opt/ipl-annotator/backend && python3 -m uvicorn 
 | ashutosh | ashutosh | admin |
 | udit | udit | admin |
 
+Each image is locked to one annotator at a time. Any admin can force-unlock a stuck image. Admins can also overwrite any annotation.
+
 ---
 
-## Annotation Process
+## Annotation Tool
 
-1. Open http://35.207.192.90:8001 and log in
-2. The sidebar shows all 1000 images. Green = annotated, white = pending, yellow padlock = locked by someone else
+A custom web tool was built for this task: **http://35.207.192.90:8001**
+
+### How to Use
+
+1. Log in with your credentials
+2. The sidebar lists all 1000 images — green = done, white = pending, yellow padlock = locked by someone else
 3. Press **Tab** to jump to the next pending image
-4. Select a team from the toolbar (or use keyboard shortcut)
-5. Click/drag cells on the grid to label them
-6. Autosave fires 800ms after the last paint — watch the "Saved" badge
-7. Press Space or Tab to move to the next image — pending save is flushed before navigating
-8. Use Erase mode (key `E`) or right-click to clear a cell back to 0
-9. Ctrl+Z / Ctrl+Shift+Z to undo/redo
+4. Select a team from the toolbar or use keyboard shortcuts
+5. Click or drag cells on the grid to paint labels
+6. Autosave fires 800ms after the last paint — watch the **Saved** badge bottom-right
+7. Press **Space** or **Tab** to move on — any pending save is flushed before switching
+8. Use **Erase** (key `E`) or right-click to clear a cell back to 0
+9. **Ctrl+Z** / **Ctrl+Shift+Z** to undo/redo
 
-**Ground truth for no-player images (img_251–img_287):** All 64 cells should be labelled 0 (empty). These images are crowd shots, scoreboards, or venue wide-shots with no visible players.
+### Keyboard Shortcuts
+
+| Action | Key |
+|---|---|
+| Select CSK–RCB | `1`–`9` |
+| Select SRH (label 10) | `0` |
+| Erase mode | `E` |
+| Next image | `Space` or `→` |
+| Previous image | `←` |
+| Jump to next pending | `Tab` |
+| Undo | `Ctrl+Z` |
+| Redo | `Ctrl+Shift+Z` |
+
+### Tool Features
+
+- **Grid overlay** — 8×8 canvas rendered over the image; click or drag to paint
+- **Autosave** — debounced 800ms save on every paint action; navigation flushes pending saves
+- **Collaborative locking** — image locked to one user for 3 minutes, 30s heartbeat renewal, auto-expires
+- **Undo/Redo** — 30-state history in the frontend
+- **Live sidebar** — polls every 3s, shows who has what locked and what's done
+- **Progress counter** — toolbar shows annotated/total and per-user count
+- **Admin force-unlock** — unstick images locked by disconnected users
+
+---
+
+## Infrastructure
+
+| | |
+|---|---|
+| **URL** | http://35.207.192.90:8001 |
+| **VM** | `aosp-build-vm-3`, GCP `asia-south1-a` |
+| **Backend** | FastAPI + uvicorn (4 workers), tmux session `ipl` |
+| **DB** | SQLite WAL at `/opt/ipl-annotator/backend/annotator.db` |
+| **Images** | `/opt/ipl-annotator/images/` |
+
+To restart the server after a VM reboot:
+```bash
+tmux new-session -d -s ipl 'cd /opt/ipl-annotator/backend && python3 -m uvicorn main:app --host 0.0.0.0 --port 8001 --workers 4'
+```
 
 ---
 
 ## Feature Extraction
 
-Once all 1000 images are annotated, an admin can click the **⚗ Features** button in the toolbar. This triggers a background extraction job that:
+Once all 1000 images are annotated, click **⚗ Features** in the toolbar. This runs a background job (~20–30 min) that:
 
-1. Reads all annotations from the database
-2. Opens each image, resizes to 800×600, crops 64 cells
-3. For each cell, computes:
-   - **HSV histogram** (96 features: 32 bins × 3 channels)
-   - **Colour moments** (9 features: mean/std/skew for H, S, V)
-   - **HOG descriptor** (3168 features: 9 orientations, 8×8 px cells, 2×2 block norm)
-   - **LBP texture histogram** (10 features: uniform LBP, P=8, R=1)
-   - **Player count** heuristic: number of grid columns containing that team ÷ 2
-4. Writes everything to `/opt/ipl-annotator/features.csv` (~64,000 rows, one per cell)
+1. Reads all annotations from the DB
+2. Opens each image, crops all 64 cells
+3. Per cell computes: **HSV histogram** (96) + **Colour moments** (9) + **HOG** (3168) + **LBP** (10) = **3283 features**
+4. Writes `features.csv` — 64,000 rows, one per cell
 
-The toolbar shows a live progress bar (polls every 2s). When extraction completes, `features.csv` auto-downloads. Total extraction time for 1000 images ≈ 20–30 minutes.
+A live progress bar shows status. The file auto-downloads when done.
 
-### CSV Schema
+### features.csv Schema
 
 ```
 image_filename, split, cell_index, row, col, label, team_name, player_count,
 hsv_h_0..31, hsv_s_0..31, hsv_v_0..31,
-cm_h_mean, cm_h_std, cm_h_skew, cm_s_mean, ..., cm_v_skew,
+cm_h_mean, cm_h_std, cm_h_skew, ..., cm_v_skew,
 hog_0..3167,
 lbp_0..9
 ```
-
-Total features per cell: **3283**
 
 ---
 
 ## Export Formats
 
-The **⬇ CSV** button exports a flat annotation CSV:
-
+**⬇ CSV** — flat annotation table, one row per image:
 ```
 Image File Name, Train Or Test, c01, c02, ..., c64
-img_1.jpg, Train, 0, 0, 3, 3, ...
+img_1.jpg, Train, 0, 0, 6, 6, 6, 0, 0, 0, ...
 ```
 
-The **⬇ JSON** button exports:
+**⬇ JSON** — structured with full label matrix:
 ```json
-[
-  {
-    "image": "img_1.jpg",
-    "split": "train",
-    "labels": [[0,0,...], [3,3,...],...],
-    "features": [0,0,3,3,...,0]
-  }
-]
+{
+  "image": "img_1.jpg",
+  "split": "train",
+  "labels": [[0,0,6,6,...], [0,6,6,6,...], ...],
+  "features": [0,0,6,6,...,0]
+}
 ```
-
----
-
-## Technical Notes
-
-**Save race fix:** Navigation (Space/Tab/Arrow) now flushes any pending debounced save synchronously before switching images. Previously, fast navigation could silently drop the last paint on an image.
-
-**Atomic CSV writes:** Feature extraction writes to `features.tmp` and renames to `features.csv` only on completion. A mid-run crash leaves no corrupt file.
-
-**Multi-worker job state:** Feature extraction status is persisted to `.feat_job.json` on disk so all 4 uvicorn workers see the same state when polled.
-
-**All-empty save:** If a user clears all 64 cells, the annotation record is deleted and the image reverts to "pending" — it won't appear as annotated in the export.

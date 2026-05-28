@@ -11,7 +11,7 @@
 
 | Property | Value |
 |---|---|
-| Total images | 1000 |
+| Total images | 1005 |
 | Format | JPEG |
 | Dimensions | 800 × 600 px (all uniform) |
 | Annotation | 8×8 grid cell labels + player count |
@@ -21,8 +21,23 @@
 
 | Split | Folder | Count |
 |---|---|---|
-| Train | `train/` | 788 |
+| Train | `train/` | 793 |
 | Test | `test/` | 212 |
+
+### Team Distribution (1005 images, any-cell presence)
+
+| Team | Images |
+|------|--------|
+| MI | 177 |
+| RCB | 153 |
+| GT | 131 |
+| RR | 131 |
+| CSK | 130 |
+| PBKS | 127 |
+| LSG | 115 |
+| KKR | 112 |
+| DC | 110 |
+| SRH | 107 |
 
 ### Label Schema (`annotations.csv`)
 

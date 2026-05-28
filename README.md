@@ -3,7 +3,7 @@
 > **Kaggle:** [goyaljai0207/ipl-player-detection-iitb-pml](https://www.kaggle.com/datasets/goyaljai0207/ipl-player-detection-iitb-pml)
 > **HuggingFace:** [goyaljai/IITB-PML-SEM1](https://huggingface.co/datasets/goyaljai/IITB-PML-SEM1)
 
-1000 IPL cricket broadcast images annotated with **8×8 grid team labels** and **player counts**, prepared for the Practical Machine Learning course, Semester 1, IIT Bombay.
+1005 IPL cricket broadcast images annotated with **8×8 grid team labels** and **player counts**, prepared for the Practical Machine Learning course, Semester 1, IIT Bombay.
 
 **Keywords:** IPL dataset, cricket player detection, IPL team classification, cricket image dataset, broadcast frame annotation, player count dataset, cricket computer vision, sports detection dataset, IITB machine learning, cricket jersey detection, multi-label cricket dataset, IPL 2024 dataset
 

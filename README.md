@@ -1,7 +1,7 @@
 # IITB PML Semester 1 — IPL Player Detection Dataset
 
 > **Kaggle:** [goyaljai0207/ipl-player-detection-iitb-pml](https://www.kaggle.com/datasets/goyaljai0207/ipl-player-detection-iitb-pml)
-> **HuggingFace:** [goyaljai/IITB-PML-SEM1](https://huggingface.co/datasets/goyaljai/IITB-PML-SEM1)
+> **HuggingFace:** [goyaljai/IPL-Player-Detection-IITB-PML](https://huggingface.co/datasets/goyaljai/IPL-Player-Detection-IITB-PML)
 
 1005 IPL cricket broadcast images annotated with **8×8 grid team labels** and **player counts**, prepared for the Python for Machine Learning course, Semester 1, IIT Bombay.
 
@@ -59,7 +59,7 @@ from huggingface_hub import snapshot_download
 from pathlib import Path
 import pandas as pd
 
-dataset_dir = Path(snapshot_download(repo_id="goyaljai/IITB-PML-SEM1", repo_type="dataset"))
+dataset_dir = Path(snapshot_download(repo_id="goyaljai/IPL-Player-Detection-IITB-PML", repo_type="dataset"))
 
 train_images = sorted((dataset_dir / "train").glob("*.jpg"))
 test_images  = sorted((dataset_dir / "test").glob("*.jpg"))

@@ -54,7 +54,7 @@ from pathlib import Path
 import pandas as pd, numpy as np
 from PIL import Image
 
-dataset_dir = Path(snapshot_download("goyaljai/IITB-PML-SEM1", repo_type="dataset"))
+dataset_dir = Path(snapshot_download("goyaljai/IPL-Player-Detection-IITB-PML", repo_type="dataset"))
 annotations = pd.read_csv(dataset_dir / "annotations.csv")
 
 rows = []

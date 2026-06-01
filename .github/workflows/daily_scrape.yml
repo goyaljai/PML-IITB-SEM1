@@ -2,7 +2,7 @@ name: Daily Flight Scraper (Free)
 
 on:
   schedule:
-    - cron: '0 12 * * *'     # Daily at 12:00 UTC (5:30 PM IST)
+    - cron: '17 12 * * *'     # Daily at 12:17 UTC (5:47 PM IST)
   workflow_dispatch:           # Manual trigger
 
 jobs:

@@ -18,7 +18,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 
 # ── Config ──────────────────────────────────────────────────────────────────
 
-DATA_DIR = "data"
+DATA_DIR = "temp"
 FILE_PATH = os.path.join(DATA_DIR, "flights.csv")
 
 CITIES = {

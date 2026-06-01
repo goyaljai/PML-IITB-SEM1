@@ -1,0 +1,41 @@
+name: Daily Flight Scraper (Free)
+
+on:
+  schedule:
+    - cron: '0 12 * * *'     # Daily at 12:00 UTC (5:30 PM IST)
+  workflow_dispatch:           # Manual trigger
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+      
+      - name: Run scraper
+        env:
+          PROXY_URL: ${{ secrets.PROXY_URL }}
+          PYTHONUNBUFFERED: "1"
+        run: python scraper.py
+      
+      - name: Commit and push data
+        run: |
+          git config user.name "goyaljai"
+          git config user.email "goyaljai.y14@gmail.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "🛫 Data: $(date -u +%Y-%m-%d)"
+          git pull --rebase
+          git push

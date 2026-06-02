@@ -1,0 +1,8 @@
+huggingface_hub
+kagglehub
+pillow
+scikit-learn
+pandas
+numpy
+matplotlib
+jupyter

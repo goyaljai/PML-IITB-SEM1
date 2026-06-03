@@ -153,7 +153,7 @@ print(classification_report(y_test, clf.predict(X_test)))
 ## Requirements
 
 ```
-pip install huggingface_hub kagglehub pillow scikit-learn pandas numpy matplotlib
+pip install huggingface_hub kagglehub pillow scikit-learn pandas numpy matplotlib opencv
 ```
 
 ---

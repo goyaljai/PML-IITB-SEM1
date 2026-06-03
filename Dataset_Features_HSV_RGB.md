@@ -16,6 +16,13 @@ Each 800×600px image is divided into an **8×8 grid** of 64 patches (100×75px 
 - **Image uniformity check**: Confirms all images are exactly 800×600px, enabling a fixed-size grid.
 - **Label distribution**: Plots team balance (IDs 1–10) and player count per image. ~80% of cells are background (label 0), which is expected.
 - **Spatial heatmap**: 8×8 heatmap showing where players most frequently appear. Players cluster in the mid-field rows, rarely at the top (sky) or extreme edges.
+- **Team-by-team spatial distributions**: Examines individual heatmaps for each team to check for fielding/batting position asymmetries.
+- **Team co-occurrence and match analysis**: Evaluates the pairings of teams (matches) and single-team/no-player images (e.g. PBKS vs RCB matches are highly represented with 21 images, whereas GT vs RCB has only 1).
+- **Annotation consistency & quality control**: Verifies that player counts and active grid annotations are strictly matched across all images.
+- **Train vs. Test split alignment check**: Confirms that team ratios and player count distributions are completely consistent across the splits to prevent model distribution shift.
+- **Spatial validity checks**: Ensures distant or single-cell players are correctly annotated, distinguishing true small features from background noise.
+- **Cross-CSV label consistency audit**: Confirms that labels are strictly identical across the independently-generated Edge, Texture, and HSV feature CSVs.
+- **Row-0 sky-region annotations**: Validates boundary-case annotations in the top row of the grid (distant crowds vs players) and verifies their consistency.
 
 ### Phase 1.5: Dominant Color Signatures per Team
 - Samples up to 10 patches per team, filters out green grass pixels (Hue 0.15–0.45), and computes the average RGB and HSV values.

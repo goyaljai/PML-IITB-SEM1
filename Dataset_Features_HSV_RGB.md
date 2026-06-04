@@ -1,6 +1,10 @@
 # IPL Player Detection — HSV/RGB Color Feature Extraction
 
-This document explains the end-to-end pipeline in `Dataset_Features_HSV_RBG.ipynb` for extracting color-based features from IPL player images and training a Random Forest classifier.
+  •  c01  = Top-Left  (0, 0) 
+  •  c08  = Top-Right  (0, 7) 
+  •  c09  = Second Row, Left  (1, 0) 
+  •  c57  = Bottom-Left  (7, 0) 
+  •  c64  = Bottom-Right  (7, 7) 
 
 ---
 

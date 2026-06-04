@@ -69,12 +69,43 @@ def init_db():
 def seed_images():
     conn = get_db()
     added = 0
-    for f in sorted(DATASET_DIR.glob("*.jpg")):
+    from huggingface_hub import snapshot_download
+    dataset_dir = Path(snapshot_download(repo_id="goyaljai/IPL-Player-Detection-IITB-PML", repo_type="dataset"))
+    
+    # 1. Insert all images
+    for f in sorted(dataset_dir.rglob("*.jpg")):
         try:
             conn.execute("INSERT OR IGNORE INTO images (filename) VALUES (?)", (f.name,))
             added += conn.execute("SELECT changes()").fetchone()[0]
         except Exception:
             pass
+            
+    # 2. Insert annotations from Dataset_Annotations.csv
+    csv_path = Path("/Users/jai.goyal/PML-IITB-SEM1/Dataset_Annotations.csv")
+    if csv_path.exists():
+        import pandas as pd
+        df = pd.read_csv(csv_path)
+        for _, row in df.iterrows():
+            img_name = row['Image File Name']
+            img_row = conn.execute("SELECT id FROM images WHERE filename=?", (img_name,)).fetchone()
+            if img_row:
+                img_id = img_row["id"]
+                # Build labels JSON array (8x8)
+                labels = [[0]*8 for _ in range(8)]
+                for i in range(1, 65):
+                    val = row[f'c{i:02d}']
+                    if pd.notna(val) and val > 0:
+                        labels[(i-1)//8][(i-1)%8] = int(val)
+                count = int(row['count']) if pd.notna(row['count']) else None
+                labels_str = json.dumps(labels)
+                try:
+                    conn.execute("""
+                        INSERT OR IGNORE INTO annotations (image_id, annotator, labels, count)
+                        VALUES (?, ?, ?, ?)
+                    """, (img_id, 'jai', labels_str, count))
+                    conn.execute("UPDATE images SET status='done' WHERE id=?", (img_id,))
+                except Exception:
+                    pass
     conn.commit()
     conn.close()
     return added

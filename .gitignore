@@ -1,3 +1,5 @@
 .DS_Store
 .vscode/
-EOF && git add -A && git commit -m "Keep only dataset and .gitignore"
+generate_notebook.py
+generate_final_notebook.py
+generate_comprehensive_notebook.py

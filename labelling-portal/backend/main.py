@@ -4,14 +4,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse, FileResponse
 import asyncio
 from pathlib import Path
-from routes import images, annotations, export, users, features
+from routes import images, annotations, export, users
 import events
 
 app = FastAPI(title="IPL Grid Annotator")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -21,7 +21,6 @@ app.include_router(users.router, prefix="/api")
 app.include_router(images.router, prefix="/api")
 app.include_router(annotations.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
-app.include_router(features.router, prefix="/api")
 
 
 @app.get("/api/health")

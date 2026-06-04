@@ -136,6 +136,14 @@ def heartbeat(image_id: int, user=Depends(get_current_user)):
     return {"ok": True}
 
 
+_HF_DATASET_DIR = None
+def get_dataset_dir():
+    global _HF_DATASET_DIR
+    if _HF_DATASET_DIR is None:
+        from huggingface_hub import snapshot_download
+        _HF_DATASET_DIR = Path(snapshot_download(repo_id="goyaljai/IPL-Player-Detection-IITB-PML", repo_type="dataset"))
+    return _HF_DATASET_DIR
+
 @router.get("/images/{image_id}/file")
 def get_image_file(image_id: int):
     conn = get_db()
@@ -143,7 +151,13 @@ def get_image_file(image_id: int):
     conn.close()
     if not row:
         raise HTTPException(404, "Image not found")
-    path = DATASET_DIR / row["filename"]
+        
+    dataset_dir = get_dataset_dir()
+    
+    path = dataset_dir / "train" / row["filename"]
+    if not path.exists():
+        path = dataset_dir / "test" / row["filename"]
+        
     if not path.exists():
         raise HTTPException(404, "File not found on disk")
     return FileResponse(str(path), media_type="image/jpeg")

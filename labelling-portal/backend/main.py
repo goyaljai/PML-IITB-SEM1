@@ -22,6 +22,9 @@ app.include_router(images.router, prefix="/api")
 app.include_router(annotations.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
 
+@app.on_event("startup")
+def startup():
+    events.set_loop(asyncio.get_running_loop())
 
 @app.get("/api/health")
 def health():

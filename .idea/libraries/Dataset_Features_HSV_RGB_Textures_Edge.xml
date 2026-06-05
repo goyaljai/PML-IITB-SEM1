@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Dataset_Features_HSV_RGB_Textures_Edge">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/Dataset_Features_HSV_RGB_Textures_Edge.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

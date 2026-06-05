@@ -17,6 +17,8 @@ def seed(user=Depends(get_current_user)):
     return {"added": added}
 
 
+TOP_IMAGES = ['img_271.jpg', 'img_522.jpg', 'img_517.jpg', 'img_661.jpg', 'img_889.jpg', 'img_18.jpg', 'img_281.jpg', 'img_68.jpg', 'img_67.jpg', 'img_753.jpg', 'img_776.jpg', 'img_201.jpg', 'img_91.jpg', 'img_86.jpg', 'img_88.jpg', 'img_605.jpg', 'img_888.jpg', 'img_749.jpg', 'img_276.jpg', 'img_423.jpg', 'img_790.jpg', 'img_490.jpg', 'img_10.jpg', 'img_299.jpg', 'img_768.jpg', 'img_425.jpg', 'img_217.jpg', 'img_804.jpg', 'img_267.jpg', 'img_457.jpg', 'img_73.jpg', 'img_72.jpg', 'img_347.jpg', 'img_24.jpg', 'img_815.jpg', 'img_89.jpg', 'img_138.jpg', 'img_379.jpg', 'img_33.jpg', 'img_353.jpg', 'img_344.jpg', 'img_402.jpg', 'img_814.jpg', 'img_417.jpg', 'img_135.jpg', 'img_515.jpg', 'img_90.jpg', 'img_992.jpg', 'img_456.jpg', 'img_454.jpg', 'img_422.jpg', 'img_298.jpg', 'img_717.jpg', 'img_750.jpg', 'img_1006.jpg', 'img_294.jpg', 'img_144.jpg']
+
 @router.get("/images")
 def list_images(user=Depends(get_current_user)):
     conn = get_db()
@@ -28,15 +30,21 @@ def list_images(user=Depends(get_current_user)):
     """, (LOCK_TIMEOUT_SECONDS,))
     conn.commit()
 
-    rows = conn.execute("""
+    placeholders = ','.join(['?'] * len(TOP_IMAGES))
+    rows = conn.execute(f"""
         SELECT i.id, i.filename, i.status, i.locked_by, i.locked_at,
                a.annotator, a.updated_at as annotated_at
         FROM images i
         LEFT JOIN annotations a ON i.id = a.image_id
-        ORDER BY CAST(SUBSTR(i.filename, 5, LENGTH(i.filename)-8) AS INTEGER)
-    """).fetchall()
+        WHERE i.filename IN ({placeholders})
+    """, tuple(TOP_IMAGES)).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    
+    # Sort the rows exactly as they appear in the TOP_IMAGES array
+    order_map = {filename: index for index, filename in enumerate(TOP_IMAGES)}
+    sorted_rows = sorted([dict(r) for r in rows], key=lambda x: order_map[x['filename']])
+    
+    return sorted_rows
 
 
 @router.get("/images/progress")
@@ -138,11 +146,7 @@ def heartbeat(image_id: int, user=Depends(get_current_user)):
 
 _HF_DATASET_DIR = None
 def get_dataset_dir():
-    global _HF_DATASET_DIR
-    if _HF_DATASET_DIR is None:
-        from huggingface_hub import snapshot_download
-        _HF_DATASET_DIR = Path(snapshot_download(repo_id="goyaljai/IPL-Player-Detection-IITB-PML", repo_type="dataset"))
-    return _HF_DATASET_DIR
+    return Path("/Users/jai.goyal/Documents/ipl/final_dataset")
 
 @router.get("/images/{image_id}/file")
 def get_image_file(image_id: int):
@@ -154,9 +158,7 @@ def get_image_file(image_id: int):
         
     dataset_dir = get_dataset_dir()
     
-    path = dataset_dir / "train" / row["filename"]
-    if not path.exists():
-        path = dataset_dir / "test" / row["filename"]
+    path = dataset_dir / row["filename"]
         
     if not path.exists():
         raise HTTPException(404, "File not found on disk")

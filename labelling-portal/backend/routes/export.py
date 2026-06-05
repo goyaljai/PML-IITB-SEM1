@@ -11,16 +11,19 @@ router = APIRouter()
 TEAMS = {0:"none",1:"CSK",2:"DC",3:"GT",4:"KKR",5:"LSG",6:"MI",7:"PBKS",8:"RR",9:"RCB",10:"SRH"}
 
 
+from routes.images import TOP_IMAGES
+
 @router.get("/export/csv")
 def export_csv(user=Depends(get_current_user)):
     conn = get_db()
-    rows = conn.execute("""
+    placeholders = ','.join(['?'] * len(TOP_IMAGES))
+    rows = conn.execute(f"""
         SELECT i.filename, i.split, a.labels, a.annotator, a.count
         FROM annotations a
         JOIN images i ON i.id = a.image_id
-        WHERE i.status = 'done'
+        WHERE i.status = 'done' AND i.filename IN ({placeholders})
         ORDER BY CAST(SUBSTR(i.filename, 5, LENGTH(i.filename)-8) AS INTEGER)
-    """).fetchall()
+    """, tuple(TOP_IMAGES)).fetchall()
     conn.close()
 
     output = io.StringIO()
@@ -41,8 +44,9 @@ def export_csv(user=Depends(get_current_user)):
         writer.writerow(row_dict)
 
     output.seek(0)
-    return StreamingResponse(
-        iter([output.getvalue()]),
+    from fastapi.responses import Response
+    return Response(
+        content=output.getvalue(),
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=annotations.csv"}
     )
@@ -51,12 +55,14 @@ def export_csv(user=Depends(get_current_user)):
 @router.get("/export/json")
 def export_json(user=Depends(get_current_user)):
     conn = get_db()
-    rows = conn.execute("""
+    placeholders = ','.join(['?'] * len(TOP_IMAGES))
+    rows = conn.execute(f"""
         SELECT i.filename, i.split, a.labels
         FROM annotations a
         JOIN images i ON i.id = a.image_id
+        WHERE i.status = 'done' AND i.filename IN ({placeholders})
         ORDER BY i.split, i.filename
-    """).fetchall()
+    """, tuple(TOP_IMAGES)).fetchall()
     conn.close()
 
     result = []
@@ -71,8 +77,9 @@ def export_json(user=Depends(get_current_user)):
         })
 
     output = json.dumps(result, indent=2)
-    return StreamingResponse(
-        iter([output]),
+    from fastapi.responses import Response
+    return Response(
+        content=output,
         media_type="application/json",
         headers={"Content-Disposition": "attachment; filename=annotations.json"}
     )

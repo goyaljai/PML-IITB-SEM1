@@ -69,8 +69,7 @@ def init_db():
 def seed_images():
     conn = get_db()
     added = 0
-    from huggingface_hub import snapshot_download
-    dataset_dir = Path(snapshot_download(repo_id="goyaljai/IPL-Player-Detection-IITB-PML", repo_type="dataset"))
+    dataset_dir = Path("/Users/jai.goyal/Documents/ipl/final_dataset")
     
     # 1. Insert all images
     for f in sorted(dataset_dir.rglob("*.jpg")):

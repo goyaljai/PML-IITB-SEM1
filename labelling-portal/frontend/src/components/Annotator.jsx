@@ -54,6 +54,8 @@ export default function Annotator() {
   const loadAnnotationForImage = async (img) => {
     stopHeartbeat()
     setImageCount(null)
+    setLabels(EMPTY_GRID())
+    setSaveStatus('loading')
     try {
       await api.lockImage(img.id)
       setSaveStatus('saved')
@@ -146,6 +148,7 @@ export default function Annotator() {
 
   const goTo = async (index) => {
     if (index === currentIndex) return
+    if (saveStatus === 'loading') return
     await flushPendingSave()
     stopHeartbeat()
     if (currentImage) api.unlockImage(currentImage.id).catch(() => {})
@@ -197,7 +200,7 @@ export default function Annotator() {
     return () => window.removeEventListener('keydown', handler)
   }, [currentIndex, eraseMode, images, triggerSave, undo, redo])
 
-  const isLocked = saveStatus === 'locked'
+  const isLocked = saveStatus === 'locked' || saveStatus === 'loading'
 
   // Detect no-player image (img_251–img_287)
   const isNoPlayer = (() => {

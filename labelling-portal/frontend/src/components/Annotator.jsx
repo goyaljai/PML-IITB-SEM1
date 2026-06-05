@@ -70,14 +70,7 @@ export default function Annotator() {
     try {
       const data = await api.getAnnotation(img.id)
       setLabels(data.labels || EMPTY_GRID())
-      // Auto-set count=0 for no-player images
-      try {
-        const num = parseInt(img.filename.replace('img_', '').replace('.jpg', ''), 10)
-        const noPlayer = num >= 251 && num <= 287
-        setImageCount(noPlayer ? 0 : (data.count ?? null))
-      } catch {
-        setImageCount(data.count ?? null)
-      }
+      setImageCount(data.count ?? null)
     } catch {
       setLabels(EMPTY_GRID())
     }
@@ -202,14 +195,7 @@ export default function Annotator() {
 
   const isLocked = saveStatus === 'locked' || saveStatus === 'loading'
 
-  // Detect no-player image (img_251–img_287)
-  const isNoPlayer = (() => {
-    if (!currentImage) return false
-    try {
-      const num = parseInt(currentImage.filename.replace('img_', '').replace('.jpg', ''), 10)
-      return num >= 251 && num <= 287
-    } catch { return false }
-  })()
+  const isNoPlayer = false
 
   const handleCountSelect = (n) => {
     if (isLocked) return

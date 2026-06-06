@@ -8,3 +8,4 @@ fix_chapter3.py
 fix_markdown.py
 generate_hog.py
 *.py
+.agents/

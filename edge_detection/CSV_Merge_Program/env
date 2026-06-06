@@ -1,0 +1,44 @@
+# Final CSV merge configuration
+# All paths are read from this env file.
+# Edit these values for your real full files.
+
+HSV_RGB_CSV=CSVs/Dataset_Features_HSV_RGB.csv
+TEXTURES_CSV=CSVs/Dataset_Features_Textures.csv
+
+# If FIX_TEXTURE_CSV=true, the program will create this fixed copy and merge from it.
+TEXTURES_FIXED_CSV=CSVs/Dataset_Features_Textures_Fixed.csv
+
+EDGE_CSV=CSVs/Dataset_Features_Edge_HOG_Richer.csv
+ANNOTATIONS_CSV=CSVs/Dataset_Annotations.csv
+
+OUTPUT_CSV=CSVs/Dataset_Features_Combined_Final.csv
+
+# Texture indexing fix:
+# true  = convert Dataset_Features_Textures.csv cell_row/cell_col from 1-8 to 0-7,
+#         save as TEXTURES_FIXED_CSV, then merge using TEXTURES_FIXED_CSV
+# false = use TEXTURES_CSV directly with no action
+FIX_TEXTURE_CSV=true
+
+# Reports
+WRITE_QUALITY_REPORT=true
+QUALITY_REPORT_TXT=CSVs/final_merge_quality_report.txt
+
+# Set this false if you do not want the metadata conflict CSV.
+WRITE_CONFLICT_REPORT=true
+CONFLICT_REPORT_CSV=CSVs/final_merge_conflict_report.csv
+
+# If true, the script fails when texture/edge/count matches are missing.
+# Use false while testing samples; consider true for the final full dataset.
+STRICT_REQUIRE_MATCHES=false
+
+# Usually false. Set true only if you want the extracted image number in the output CSV.
+KEEP_IMAGE_NUMBER=false
+
+# Fold boundaries:
+# img_1.jpg   to img_250.jpg -> fold_id = 1
+# img_251.jpg to img_500.jpg -> fold_id = 2
+# img_501.jpg to img_750.jpg -> fold_id = 3
+# img_751.jpg onward         -> fold_id = 4
+FOLD_1_MAX=250
+FOLD_2_MAX=500
+FOLD_3_MAX=750

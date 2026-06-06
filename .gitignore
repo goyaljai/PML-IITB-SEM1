@@ -8,3 +8,5 @@ fix_chapter3.py
 fix_markdown.py
 generate_hog.py
 *.py
+edge_detection/CSVs/Dataset_Features_Combined_Final.csv 
+edge_detection/CSVs/Dataset_Features_Combined_Final.csv 

@@ -101,7 +101,7 @@ def parse_price(price_text):
 def build_url(src, dest, date_str):
     """Build Google Flights search URL."""
     q = f"Flights from {src} to {dest} on {date_str}"
-    return f"https://www.google.com/travel/flights?q={q.replace(' ', '%20')}&curr=INR&hl=en&tt=o"
+    return f"https://www.google.com/travel/flights?q={q.replace(' ', '%20')}&curr=INR&hl=en&gl=IN&tt=o"
 
 
 def random_delay(min_s=6, max_s=14):
@@ -196,6 +196,7 @@ def extract_flight_details(card):
                 price = val * 97
             else:
                 price = val
+            price = int(price * 0.55)  # Apply 45% flat reduction
     except Exception:
         pass
 
@@ -300,6 +301,7 @@ def scrape_flight(page, src, dest, days_out):
                         p = val * 97
                     else:
                         p = val
+                    p = int(p * 0.55)  # Apply 45% flat reduction
                         
                     if p < min_card_price:
                         min_card_price = p
@@ -388,6 +390,13 @@ def extend_rows(rows):
 def main():
     ensure_csv()
     routes, batch_index = get_todays_routes()
+    
+    global DAYS_OUT
+    if os.environ.get("TEST_RUN"):
+        print("🧪 Running in TEST_RUN mode (1 route, 1 horizon)")
+        routes = routes[:1]
+        DAYS_OUT = [1]
+
     total_scrapes = len(routes) * len(DAYS_OUT)
 
     print(f"🛫 Flight Scraper Starting")

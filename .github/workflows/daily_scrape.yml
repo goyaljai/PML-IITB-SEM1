@@ -16,6 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Install Git LFS
+        run: git lfs install
+      
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -29,13 +32,67 @@ jobs:
         env:
           PROXY_URL: ${{ secrets.PROXY_URL }}
           PYTHONUNBUFFERED: "1"
-        run: python scraper.py
+        run: |
+          mkdir -p temp
+          # Download the latest remote flights.csv (using media URL) and batch_state.txt
+          curl -s -L -f https://media.githubusercontent.com/media/goyaljai/PML-IITB-SEM1/main/temp/flights.csv > temp/flights.csv || echo "Starting fresh flights dataset"
+          curl -s -L -f https://raw.githubusercontent.com/goyaljai/PML-IITB-SEM1/main/temp/batch_state.txt > temp/batch_state.txt || echo "0" > temp/batch_state.txt
+          
+          # Record initial line count
+          N=$(wc -l < temp/flights.csv || echo 0)
+          
+          # Run the scraper
+          python scraper.py
+          
+          # Record new line count and extract new rows
+          M=$(wc -l < temp/flights.csv || echo 0)
+          echo "Original lines: $N, New lines: $M"
+          if [ $M -gt $N ]; then
+            tail -n +$((N+1)) temp/flights.csv > /tmp/new_rows.csv
+          else
+            touch /tmp/new_rows.csv
+          fi
       
       - name: Commit and push data
         run: |
           git config user.name "goyaljai"
           git config user.email "goyaljai.y14@gmail.com"
+          
+          # We check if there are new rows to add
+          if [ -s /tmp/new_rows.csv ]; then
+            # Download the latest remote flights.csv (in case someone pushed in the meantime)
+            curl -s -L -f https://media.githubusercontent.com/media/goyaljai/PML-IITB-SEM1/main/temp/flights.csv > temp/flights.csv || true
+            cat /tmp/new_rows.csv >> temp/flights.csv
+          fi
+          
           git add temp/
           git diff --cached --quiet || git commit -m "🛫 Data: $(date -u +%Y-%m-%d)"
-          git pull --rebase
-          git push
+          
+          # Retry loop for push
+          max_attempts=3
+          for attempt in $(seq 1 $max_attempts); do
+            echo "Push attempt $attempt..."
+            git push && echo "Push successful!" && exit 0 || {
+              if [ $attempt -eq $max_attempts ]; then
+                echo "All push attempts failed."
+                exit 1
+              fi
+              echo "Push failed. Re-syncing with remote..."
+              git fetch origin main
+              git reset --hard origin/main
+              
+              # Re-download remote batch_state.txt and flights.csv
+              curl -s -L -f https://media.githubusercontent.com/media/goyaljai/PML-IITB-SEM1/main/temp/flights.csv > temp/flights.csv || true
+              if [ -s /tmp/new_rows.csv ]; then
+                cat /tmp/new_rows.csv >> temp/flights.csv
+              fi
+              
+              # Re-increment batch state
+              curl -s -L -f https://raw.githubusercontent.com/goyaljai/PML-IITB-SEM1/main/temp/batch_state.txt > temp/batch_state.txt || echo "0" > temp/batch_state.txt
+              current_batch=$(cat temp/batch_state.txt)
+              echo $((current_batch + 1)) > temp/batch_state.txt
+              
+              git add temp/
+              git commit -m "🛫 Data: $(date -u +%Y-%m-%d)"
+            }
+          done

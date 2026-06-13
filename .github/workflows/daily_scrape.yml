@@ -91,8 +91,8 @@ jobs:
               curl -s -L -f https://raw.githubusercontent.com/goyaljai/PML-IITB-SEM1/main/temp/batch_state.txt > temp/batch_state.txt || echo "0" > temp/batch_state.txt
               current_batch=$(cat temp/batch_state.txt)
               echo $((current_batch + 1)) > temp/batch_state.txt
-              
+              # Re-add and re-commit
               git add temp/
-              git commit -m "🛫 Data: $(date -u +%Y-%m-%d)"
+              git diff --cached --quiet || git commit -m "🛫 Data: $(date -u +%Y-%m-%d)"
             }
           done

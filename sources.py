@@ -72,6 +72,13 @@ class FliSource(FlightSource):
     name = "fli"
 
     def __init__(self):
+        # Apply our runtime patch to the (latest) installed fli before use, so
+        # fli drops implausible-priced rows at the source. Best-effort.
+        try:
+            import fli_patch
+            fli_patch.apply()
+        except Exception as e:  # noqa: BLE001 - patch is optional; sanity filter backstops
+            print(f"   ⚠️  fli_patch not applied: {e!r}")
         # Lazy imports so a broken/missing fli only disables this source.
         from fli.models import (
             Airport, FlightSearchFilters, FlightSegment, MaxStops,

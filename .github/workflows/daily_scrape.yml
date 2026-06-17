@@ -25,12 +25,13 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install playwright
-          playwright install --with-deps chromium
-      
+          pip install flights
+
       - name: Run scraper
         env:
-          PROXY_URL: ${{ secrets.PROXY_URL }}
+          # curl_cffi (used by fli) honors standard proxy env vars.
+          HTTP_PROXY: ${{ secrets.PROXY_URL }}
+          HTTPS_PROXY: ${{ secrets.PROXY_URL }}
           PYTHONUNBUFFERED: "1"
         run: |
           mkdir -p temp

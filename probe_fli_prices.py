@@ -23,6 +23,26 @@ def main():
     date = (datetime.now() + timedelta(days=DAYS)).strftime("%Y-%m-%d")
     src, dest = ROUTE
 
+    # Spy on fli's raw price blocks BEFORE our patch, to see what ₹69 really is.
+    raw_blocks = []
+    try:
+        from fli.search import _decoders
+        _orig = _decoders._parse_price_info
+        if not getattr(_orig, "_spy", False):
+            def _spy(row):
+                pb = _decoders._get_price_block(row)
+                try:
+                    res = _orig(row)
+                    raw_blocks.append((res[0], pb))
+                    return res
+                except Exception:
+                    raw_blocks.append(("ERR", pb))
+                    raise
+            _spy._spy = True
+            _decoders._parse_price_info = _spy
+    except Exception as e:
+        print(f"spy setup failed: {e!r}")
+
     import sources
     fli = sources.FliSource()
     ff = sources.FastFlightsSource()
@@ -62,6 +82,15 @@ def main():
         print(f"  cheapest: ₹{min(p2)}  median: ₹{p2[len(p2)//2]}" if p2 else "  none")
     except Exception as e:
         print(f"[fast-flights] ERROR {e!r}")
+
+    # Show the raw price blocks for the lowest-decoded rows — reveals what the
+    # bogus ₹69 actually is in Google's structure.
+    if raw_blocks:
+        numeric = [(p, pb) for p, pb in raw_blocks if isinstance(p, (int, float))]
+        numeric.sort(key=lambda x: x[0])
+        print("\n🔬 Lowest-decoded rows (decoded_price, raw_price_block):")
+        for p, pb in numeric[:6]:
+            print(f"   decoded=₹{int(p)}  block={pb}")
 
     print("\nVERDICT: if fli's 'plausible cheapest' matches fast-flights, fli is")
     print("fine except for a few outlier rows the sanity filter already drops.")

@@ -108,6 +108,13 @@ CSV_HEADERS = [
 MAX_ATTEMPTS = 3
 BACKOFF_SCHEDULE = [2, 4, 8]  # seconds before attempts 2, 3 (index by attempt-1)
 
+# Wall-clock budget for the whole scrape loop (minutes). A hard ceiling so the
+# job can never run away (e.g. an IP that warms enough to pass the canary but
+# then drips empties, multiplying per-route retries into hours). When the budget
+# is hit we stop scraping and commit whatever was collected. 0 = unlimited.
+# Default 75 min keeps us well under GitHub's 6h cap with margin for the batch.
+SCRAPE_BUDGET_MIN = float(os.environ.get("SCRAPE_BUDGET_MIN", "75"))
+
 # Sources are built once (in fallback order) and reused across the run.
 # Override order/subset with FLIGHT_SOURCES="fli,fast-flights,playwright".
 _src_env = os.environ.get("FLIGHT_SOURCES")
@@ -435,16 +442,28 @@ def main():
     print(f"   Horizons: {DAYS_OUT}")
     print(f"   Total scrapes: {total_scrapes}")
     print(f"   Output file: {out_path}")
+    print(f"   Time budget: {int(SCRAPE_BUDGET_MIN)} min" if SCRAPE_BUDGET_MIN else "   Time budget: unlimited")
     print()
 
     success_count = 0   # scrapes that yielded ≥1 flight row
     noflight_count = 0  # scrapes that returned a NoFlights row (valid, but no fares)
     fail_count = 0      # scrapes that errored out entirely
 
+    deadline = (time.monotonic() + SCRAPE_BUDGET_MIN * 60) if SCRAPE_BUDGET_MIN else None
+    budget_hit = False
+
     for i, (src, dest) in enumerate(routes):
+        if deadline and time.monotonic() >= deadline:
+            print(f"\n⏱️  Time budget ({int(SCRAPE_BUDGET_MIN)} min) reached after "
+                  f"{i}/{len(routes)} routes — stopping early, committing what we have.")
+            budget_hit = True
+            break
         print(f"\n[{i+1}/{len(routes)}] Route: {src} → {dest}")
 
         for days in DAYS_OUT:
+            if deadline and time.monotonic() >= deadline:
+                budget_hit = True
+                break
             results = scrape_flight(src, dest, days)
             if results:
                 extend_rows(results, out_path)

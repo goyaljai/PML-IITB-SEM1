@@ -56,6 +56,14 @@ CANARY_DAYS_OUT = 7
 CANARY_MAX_WAIT_S = float(os.environ.get("CANARY_MAX_WAIT_S", "900"))   # 15 min
 CANARY_PROBE_INTERVAL_S = float(os.environ.get("CANARY_PROBE_INTERVAL_S", "30"))
 
+# Price sanity bounds (INR). Guards against parsing artifacts — e.g. fli has
+# been observed returning a garbage cheapest fare like ₹69 from some IPs while
+# fast-flights returns the correct ₹6508. Fares outside this range are dropped
+# so the multi-source layer falls through to a source that parses correctly.
+# No real Indian domestic economy fare is below ~₹1000 or above ~₹200000.
+MIN_PLAUSIBLE_PRICE = float(os.environ.get("MIN_PLAUSIBLE_PRICE", "1000"))
+MAX_PLAUSIBLE_PRICE = float(os.environ.get("MAX_PLAUSIBLE_PRICE", "200000"))
+
 # Fail the job if the success rate drops below this (catches partial outages,
 # IP blocks, or library rot that the canary didn't catch). 0.0–1.0.
 MIN_SUCCESS_RATE = float(os.environ.get("MIN_SUCCESS_RATE", "0.70"))
@@ -161,9 +169,24 @@ def _fmt_time(dt):
 
 # ── Core search ───────────────────────────────────────────────────────────────
 
+def _sanitize_prices(flights):
+    """Drop flights whose price is outside the plausible range (parsing
+    artifacts like fli's ₹69 glitch). Flights with no price are kept (they
+    carry other signal); only clearly-bogus priced rows are removed."""
+    clean = []
+    for f in flights:
+        if f.price is not None and not (MIN_PLAUSIBLE_PRICE <= f.price <= MAX_PLAUSIBLE_PRICE):
+            continue  # implausible fare → drop
+        clean.append(f)
+    return clean
+
+
 def _search_route_multisource(src, dest, days_out):
     """Try each source in fallback order; return (flights, source_name, errored).
     Retries each source on transient empties before falling through to the next.
+    A source is only accepted if it yields at least one PLAUSIBLY-priced flight —
+    so a source returning only garbage fares (e.g. fli's ₹69 parsing glitch on
+    some IPs) is skipped in favour of one that parses correctly.
     `errored` is True only when EVERY source raised an exception (a real outage)
     rather than cleanly returning no flights — so callers can tell "route has no
     fares" apart from "the pipeline is broken"."""
@@ -176,7 +199,14 @@ def _search_route_multisource(src, dest, days_out):
                 flights = source.search(src, dest, target_date)
                 raised_every_attempt = False  # got a clean answer (possibly empty)
                 if flights:
-                    return flights, source.name, False
+                    clean = _sanitize_prices(flights)
+                    # Accept only if at least one plausibly-priced fare survived.
+                    if any(f.price is not None for f in clean):
+                        dropped = len(flights) - len(clean)
+                        if dropped:
+                            print(f"     [{source.name}] dropped {dropped} implausible-priced rows")
+                        return clean, source.name, False
+                    # else: source returned only bogus/again-empty → fall through
             except Exception as e:  # noqa: BLE001 - try the next source, never abort
                 if attempt == MAX_ATTEMPTS:
                     print(f"     [{source.name}] error after {MAX_ATTEMPTS} tries: {e!r}")
@@ -184,7 +214,7 @@ def _search_route_multisource(src, dest, days_out):
                 time.sleep(BACKOFF_SCHEDULE[attempt - 1])
         if not raised_every_attempt:
             any_clean_empty = True
-        # this source gave nothing — fall through to the next
+        # this source gave nothing usable — fall through to the next
     # errored = no source ever returned cleanly (all raised) → genuine outage
     return [], None, (not any_clean_empty)
 

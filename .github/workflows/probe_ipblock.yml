@@ -15,7 +15,12 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install flights fast-flights
-      - name: Probe
+      - name: Probe IP block
         env:
           PYTHONUNBUFFERED: "1"
         run: python probe_ipblock.py
+      - name: Probe fli price structure (₹69 diagnosis)
+        if: always()
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: python probe_fli_prices.py

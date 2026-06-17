@@ -41,11 +41,20 @@ SCHEMA_VERSION = "3"
 def current_file_path():
     return os.path.join(DATA_DIR, f"flights_{datetime.now():%Y_%m}.csv")
 
-# Canary: a known-good route we expect to always return results. If it comes
-# back empty at startup, fli is likely broken (Google changed its protocol) —
-# fail loudly instead of silently committing an empty dataset.
+# Canary: a known-good route we expect to always return results. Used to decide
+# whether the pipeline is healthy before committing to a full run.
+#
+# IMPORTANT — datacenter-IP warm-up: from a fresh datacenter IP (e.g. GitHub
+# Actions), Google Flights soft-throttles the first few minutes of requests
+# (empty responses) before "warming up" and serving normally. Observed ~3.5 min
+# of empties then success. So the canary is PATIENT: it keeps retrying for up to
+# CANARY_MAX_WAIT_S before concluding the pipeline is truly broken. Only a
+# sustained failure across the whole window (the library-rot / hard-block case)
+# aborts the run.
 CANARY_ROUTE = ("BOM", "DEL")
 CANARY_DAYS_OUT = 7
+CANARY_MAX_WAIT_S = float(os.environ.get("CANARY_MAX_WAIT_S", "420"))   # ~7 min
+CANARY_PROBE_INTERVAL_S = float(os.environ.get("CANARY_PROBE_INTERVAL_S", "30"))
 
 # Fail the job if the success rate drops below this (catches partial outages,
 # IP blocks, or library rot that the canary didn't catch). 0.0–1.0.
@@ -320,23 +329,40 @@ def _no_flight_row(src, dest, days_out):
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def run_canary():
-    """Fail loudly if a known-good route returns nothing across ALL sources —
-    the clearest signal the pipeline is broken (Google protocol change breaking
-    every library at once). Returns True if any source answered."""
+    """Patiently confirm the pipeline can fetch a known-good route before
+    committing to a full run. Retries for up to CANARY_MAX_WAIT_S to absorb the
+    datacenter-IP warm-up period (fresh IPs get empty responses for the first
+    few minutes, then start working). Returns True as soon as any source serves
+    fares; False only if the entire window elapses with nothing — the genuine
+    library-rot / hard-block signal."""
     src, dest = CANARY_ROUTE
     print(f"🐤 Canary check: {src}→{dest} +{CANARY_DAYS_OUT}d "
-          f"(sources: {', '.join(s.name for s in SOURCES) or 'NONE'}) ...")
+          f"(sources: {', '.join(s.name for s in SOURCES) or 'NONE'}; "
+          f"patient up to {int(CANARY_MAX_WAIT_S)}s) ...")
     if not SOURCES:
         print("   ❌ Canary FAILED — no flight sources could be initialised.")
         return False
-    flights, used, _errored = _search_route_multisource(src, dest, CANARY_DAYS_OUT)
-    priced = [f for f in (flights or []) if f.price is not None]
-    if priced:
-        cheapest = int(min(f.price for f in priced))
-        print(f"   ✅ Canary OK via [{used}] ({len(flights)} results, cheapest ₹{cheapest})")
-        return True
-    print("   ❌ Canary FAILED — every source returned no results for a "
-          "known-good route. Pipeline likely broken (Google protocol change).")
+
+    deadline = time.monotonic() + CANARY_MAX_WAIT_S
+    attempt = 0
+    while True:
+        attempt += 1
+        flights, used, _errored = _search_route_multisource(src, dest, CANARY_DAYS_OUT)
+        priced = [f for f in (flights or []) if f.price is not None]
+        if priced:
+            cheapest = int(min(f.price for f in priced))
+            print(f"   ✅ Canary OK via [{used}] on attempt {attempt} "
+                  f"({len(flights)} results, cheapest ₹{cheapest})")
+            return True
+        if time.monotonic() >= deadline:
+            break
+        print(f"   … attempt {attempt} empty (likely IP warm-up); "
+              f"retrying in {int(CANARY_PROBE_INTERVAL_S)}s")
+        time.sleep(CANARY_PROBE_INTERVAL_S)
+
+    print(f"   ❌ Canary FAILED — no fares for a known-good route after "
+          f"{int(CANARY_MAX_WAIT_S)}s across all sources. Pipeline likely "
+          f"broken (protocol change) or IP hard-blocked.")
     return False
 
 

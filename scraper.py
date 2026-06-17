@@ -53,7 +53,7 @@ def current_file_path():
 # aborts the run.
 CANARY_ROUTE = ("BOM", "DEL")
 CANARY_DAYS_OUT = 7
-CANARY_MAX_WAIT_S = float(os.environ.get("CANARY_MAX_WAIT_S", "420"))   # ~7 min
+CANARY_MAX_WAIT_S = float(os.environ.get("CANARY_MAX_WAIT_S", "900"))   # 15 min
 CANARY_PROBE_INTERVAL_S = float(os.environ.get("CANARY_PROBE_INTERVAL_S", "30"))
 
 # Fail the job if the success rate drops below this (catches partial outages,

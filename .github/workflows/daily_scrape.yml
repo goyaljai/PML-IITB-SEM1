@@ -5,95 +5,111 @@ on:
     - cron: '17 12 * * *'     # Daily at 12:17 UTC (5:47 PM IST)
   workflow_dispatch:           # Manual trigger
 
+# Avoid overlapping runs clobbering each other's commits.
+concurrency:
+  group: daily-scrape
+  cancel-in-progress: false
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write          # push data
+      issues: write            # open an alert issue on total failure
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      PYTHONUNBUFFERED: "1"
 
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          lfs: true            # CSVs are LFS-tracked
+
       - name: Install Git LFS
         run: git lfs install
-      
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
-      - name: Install dependencies
+
+      # Layer 0: install the pinned known-good versions first. temp/.fli_version
+      # holds "flights==X.Y.Z fast-flights==A.B.C" (space-separated). If absent,
+      # install latest.
+      - name: Install dependencies (pinned)
         run: |
-          pip install flights
+          if [ -f temp/.fli_version ]; then
+            echo "Installing pinned: $(cat temp/.fli_version)"
+            pip install $(cat temp/.fli_version) || pip install flights fast-flights
+          else
+            pip install flights fast-flights
+          fi
 
       - name: Run scraper
+        id: scrape
         env:
-          # curl_cffi (used by fli) honors standard proxy env vars.
+          # curl_cffi (fli) and fast-flights honor standard proxy env vars.
           HTTP_PROXY: ${{ secrets.PROXY_URL }}
           HTTPS_PROXY: ${{ secrets.PROXY_URL }}
-          PYTHONUNBUFFERED: "1"
+        run: python scraper.py
+
+      # Layer 1: if the scraper failed (canary/fare-rate gate tripped), try
+      # upgrading the libraries and re-running just the canary. If that recovers,
+      # record the new known-good versions so the next run uses them.
+      - name: Recovery — upgrade libraries and re-check canary
+        if: failure() && steps.scrape.outcome == 'failure'
+        id: recovery
+        env:
+          HTTP_PROXY: ${{ secrets.PROXY_URL }}
+          HTTPS_PROXY: ${{ secrets.PROXY_URL }}
+          CANARY_ONLY: "1"
         run: |
-          mkdir -p temp
-          # Download the latest remote flights.csv (using media URL) and batch_state.txt
-          curl -s -L -f https://media.githubusercontent.com/media/goyaljai/PML-IITB-SEM1/main/temp/flights.csv > temp/flights.csv || echo "Starting fresh flights dataset"
-          curl -s -L -f https://raw.githubusercontent.com/goyaljai/PML-IITB-SEM1/main/temp/batch_state.txt > temp/batch_state.txt || echo "0" > temp/batch_state.txt
-          
-          # Record initial line count
-          N=$(wc -l < temp/flights.csv || echo 0)
-          
-          # Run the scraper
-          python scraper.py
-          
-          # Record new line count and extract new rows
-          M=$(wc -l < temp/flights.csv || echo 0)
-          echo "Original lines: $N, New lines: $M"
-          if [ $M -gt $N ]; then
-            tail -n +$((N+1)) temp/flights.csv > /tmp/new_rows.csv
+          echo "Scraper failed — attempting library upgrade + canary recheck..."
+          pip install --upgrade flights fast-flights
+          if python scraper.py; then
+            echo "recovered=true" >> "$GITHUB_OUTPUT"
+            # Record the now-known-good versions for future runs.
+            FLI=$(pip show flights | awk '/^Version:/{print $2}')
+            FF=$(pip show fast-flights | awk '/^Version:/{print $2}')
+            echo "flights==$FLI fast-flights==$FF" > temp/.fli_version
+            echo "New known-good pin: $(cat temp/.fli_version)"
           else
-            touch /tmp/new_rows.csv
+            echo "recovered=false" >> "$GITHUB_OUTPUT"
+            echo "Canary still failing after upgrade — sources likely broken."
           fi
-      
+
+      # Commit whatever data we have (runs even if the scrape gate tripped, so
+      # partial data + any new version pin are preserved). Skipped only if there
+      # is literally nothing to commit.
       - name: Commit and push data
+        if: always()
         run: |
           git config user.name "goyaljai"
           git config user.email "goyaljai.y14@gmail.com"
-          
-          # We check if there are new rows to add
-          if [ -s /tmp/new_rows.csv ]; then
-            # Download the latest remote flights.csv (in case someone pushed in the meantime)
-            curl -s -L -f https://media.githubusercontent.com/media/goyaljai/PML-IITB-SEM1/main/temp/flights.csv > temp/flights.csv || true
-            cat /tmp/new_rows.csv >> temp/flights.csv
-          fi
-          
           git add temp/
-          git diff --cached --quiet || git commit -m "🛫 Data: $(date -u +%Y-%m-%d)"
-          
-          # Retry loop for push
-          max_attempts=3
-          for attempt in $(seq 1 $max_attempts); do
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+          git commit -m "🛫 Data: $(date -u +%Y-%m-%d)"
+          for attempt in 1 2 3; do
             echo "Push attempt $attempt..."
-            git push && echo "Push successful!" && exit 0 || {
-              if [ $attempt -eq $max_attempts ]; then
-                echo "All push attempts failed."
-                exit 1
-              fi
-              echo "Push failed. Re-syncing with remote..."
-              git fetch origin main
-              git reset --hard origin/main
-              
-              # Re-download remote batch_state.txt and flights.csv
-              curl -s -L -f https://media.githubusercontent.com/media/goyaljai/PML-IITB-SEM1/main/temp/flights.csv > temp/flights.csv || true
-              if [ -s /tmp/new_rows.csv ]; then
-                cat /tmp/new_rows.csv >> temp/flights.csv
-              fi
-              
-              # Re-increment batch state
-              curl -s -L -f https://raw.githubusercontent.com/goyaljai/PML-IITB-SEM1/main/temp/batch_state.txt > temp/batch_state.txt || echo "0" > temp/batch_state.txt
-              current_batch=$(cat temp/batch_state.txt)
-              echo $((current_batch + 1)) > temp/batch_state.txt
-              # Re-add and re-commit
-              git add temp/
-              git diff --cached --quiet || git commit -m "🛫 Data: $(date -u +%Y-%m-%d)"
-            }
+            if git push; then echo "Push successful!"; break; fi
+            if [ "$attempt" -eq 3 ]; then echo "All push attempts failed."; exit 1; fi
+            git fetch origin main
+            git rebase origin/main || git rebase --abort
           done
+
+      # Alert: if the scrape failed AND recovery didn't fix it, open (or reuse)
+      # a GitHub issue so the breakage is visible. De-duplicated by title.
+      - name: Open alert issue on unrecovered failure
+        if: failure() && steps.recovery.outputs.recovered != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="🚨 Flight scraper pipeline broken"
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number' || echo "")
+          BODY="The daily flight scraper failed and auto-recovery (library upgrade + canary) did not restore it. Likely a Google protocol change breaking all sources, or a sustained block. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "Still failing on $(date -u +%Y-%m-%d). $BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi

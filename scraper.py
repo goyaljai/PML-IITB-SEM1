@@ -415,6 +415,15 @@ def main():
         print("🧪 Running in TEST_RUN mode (1 route, 1 horizon)")
         routes = routes[:1]
         DAYS_OUT = [1]
+    else:
+        # Optional sample cap for fast end-to-end validation without the full
+        # ~420-scrape batch. MAX_ROUTES / MAX_HORIZONS limit the work.
+        max_routes = int(os.environ.get("MAX_ROUTES", "0") or 0)
+        if max_routes > 0:
+            routes = routes[:max_routes]
+        max_h = int(os.environ.get("MAX_HORIZONS", "0") or 0)
+        if max_h > 0:
+            DAYS_OUT = DAYS_OUT[:max_h]
 
     out_path = current_file_path()
     ensure_csv(out_path)

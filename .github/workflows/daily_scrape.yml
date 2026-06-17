@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: '17 12 * * *'     # Daily at 12:17 UTC (5:47 PM IST)
   workflow_dispatch:           # Manual trigger
+    inputs:
+      max_routes:
+        description: 'Limit routes for a fast sample run (0 = full batch)'
+        required: false
+        default: '0'
+      max_horizons:
+        description: 'Limit booking horizons (0 = all 6)'
+        required: false
+        default: '0'
 
 # Avoid overlapping runs clobbering each other's commits.
 concurrency:
@@ -49,6 +58,8 @@ jobs:
           # curl_cffi (fli) and fast-flights honor standard proxy env vars.
           HTTP_PROXY: ${{ secrets.PROXY_URL }}
           HTTPS_PROXY: ${{ secrets.PROXY_URL }}
+          MAX_ROUTES: ${{ github.event.inputs.max_routes || '0' }}
+          MAX_HORIZONS: ${{ github.event.inputs.max_horizons || '0' }}
         run: python scraper.py
 
       # Layer 1: if the scraper failed (canary/fare-rate gate tripped), try

@@ -82,13 +82,14 @@ echo "python=$(python -V 2>&1) at $(command -v python)"
 # typing_extensions is a transitive dep that's been seen missing from a clean
 # install of fast-flights==3.0.2 — installing it eagerly is cheap insurance.
 echo "--- pip upgrade ---"
+# A transient PyPI failure should NOT kill the day's scrape — if the previous
+# run's fast-flights is still importable, that's good enough. Only fail hard
+# if neither the upgrade NOR the prior version yields a working import.
 python -m pip install --quiet --upgrade pip || echo "WARN: pip self-upgrade failed"
-python -m pip install --quiet --upgrade fast-flights PyYAML typing_extensions || {
-  echo "ERROR: pip upgrade failed; aborting before scrape"
-  exit 5
-}
+python -m pip install --quiet --upgrade fast-flights PyYAML typing_extensions \
+  || echo "WARN: pip upgrade failed; falling back to currently-installed version"
 python -c "import fast_flights; print('fast_flights =', getattr(fast_flights, '__version__', 'unknown'))" \
-  || { echo "ERROR: fast_flights not importable after upgrade"; exit 5; }
+  || { echo "ERROR: fast_flights not importable (no usable version present)"; exit 5; }
 
 # ── 4) Sync repo state with origin ──────────────────────────────────────────
 # Gitignored state (logs/, .batch_state, .lock) is never touched by git ops.

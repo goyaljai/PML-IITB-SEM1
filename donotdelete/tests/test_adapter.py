@@ -216,6 +216,30 @@ def test_price_none_when_zero_or_missing(fake_fast_flights):
     assert n.price is None
 
 
+def test_real_sigalrm_timeout_fires(fake_fast_flights):
+    """The per-call SIGALRM timeout actually fires on a hung call.
+
+    This exercises the real `_call_timeout` context manager (not mocked) by
+    making `get_flights` sleep longer than the configured timeout. The first
+    call should raise APITimeout; subsequent retries are short-circuited via
+    max_attempts=1 so the test runs quickly.
+    """
+    import time
+    fake_fast_flights.get_flights = lambda _q: time.sleep(10)  # hang past the timeout
+    from scraper import adapter
+    t0 = time.monotonic()
+    with pytest.raises(adapter.AdapterError):
+        adapter.search_flights(
+            origin="BOM", destination="DEL", date_str="2026-06-25",
+            timeout_seconds=1,
+            max_attempts=1, backoff_base=0, backoff_max=0, backoff_jitter=0,
+            sleep_fn=lambda _s: None,
+        )
+    elapsed = time.monotonic() - t0
+    # SIGALRM should fire within ~1s; allow 3s grace for slow CI.
+    assert elapsed < 3.0, f"timeout did not fire within budget (elapsed {elapsed:.2f}s)"
+
+
 def test_backoff_called_between_attempts(fake_fast_flights):
     """Confirm we actually sleep between attempts."""
     calls = {"n": 0}

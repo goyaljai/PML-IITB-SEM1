@@ -390,6 +390,7 @@ def run_canary():
             cheapest = int(min(f.price for f in priced))
             print(f"   ✅ Canary OK via [{used}] on attempt {attempt} "
                   f"({len(flights)} results, cheapest ₹{cheapest})")
+            _promote_source(used)
             return True
         if time.monotonic() >= deadline:
             break
@@ -401,6 +402,23 @@ def run_canary():
           f"{int(CANARY_MAX_WAIT_S)}s across all sources. Pipeline likely "
           f"broken (protocol change) or IP hard-blocked.")
     return False
+
+
+def _promote_source(name):
+    """Move the canary-proven healthy source to the front of SOURCES so the
+    whole run tries the source that actually works on THIS IP first. On a
+    foreign IP where fli is dead (0%) but fast-flights works, this stops every
+    route from burning fli's full retry budget before falling through — the
+    cause of the earlier multi-hour runaway run."""
+    global SOURCES
+    if not name:
+        return
+    idx = next((i for i, s in enumerate(SOURCES) if s.name == name), None)
+    if idx is None or idx == 0:
+        return
+    SOURCES.insert(0, SOURCES.pop(idx))
+    print(f"   ↻ Reordered sources — '{name}' promoted to primary for this run: "
+          f"{', '.join(s.name for s in SOURCES)}")
 
 
 def main():

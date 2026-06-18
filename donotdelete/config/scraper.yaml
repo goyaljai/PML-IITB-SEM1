@@ -89,3 +89,11 @@ log_retention_days: 30
 cabin: economy
 adults: 1
 currency: INR
+
+# ── Display timezone ─────────────────────────────────────────────────────────
+# IANA zone used to stamp the human-facing date/time columns (Scrape_Timestamp,
+# Booking_Day_Of_Week) and to derive the travel dates we query and record
+# (Departure_Date, Day_of_Week, Is_Weekend_Departure). Set to the data's frame
+# of reference so timestamps read in local time WITHOUT changing the host clock.
+# Falls back to UTC if the zone can't be resolved (missing tzdata).
+display_timezone: Asia/Kolkata

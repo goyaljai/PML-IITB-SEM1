@@ -75,3 +75,20 @@ def test_success_rate_in_range(tmp_path):
     (cfg_dir / "scraper.yaml").write_text("min_success_rate: 1.5\n")
     with pytest.raises(ValueError):
         config.load(base_dir=tmp_path)
+
+
+def test_display_timezone_default_is_kolkata(tmp_path):
+    cfg = config.load(base_dir=tmp_path)
+    assert cfg.display_timezone == "Asia/Kolkata"
+    # IST is UTC+5:30 = 19800 seconds.
+    from datetime import datetime, timezone
+    offset = cfg.display_tz.utcoffset(datetime(2026, 6, 18, tzinfo=timezone.utc))
+    assert offset is not None and offset.total_seconds() == 19800
+
+
+def test_resolve_timezone_falls_back_to_utc_on_bad_name():
+    from datetime import timezone
+    # A nonsense zone must never raise — it degrades to UTC.
+    assert config.resolve_timezone("Not/AZone") is timezone.utc
+    assert config.resolve_timezone("UTC") is timezone.utc
+    assert config.resolve_timezone("") is timezone.utc

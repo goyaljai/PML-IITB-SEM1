@@ -104,7 +104,7 @@ if [ -n "$LAST_CSV" ]; then
   echo "  newest CSV:   $LAST_CSV"
   echo "  mtime age:    ${AGE_H} h"
   if [ "$AGE_H" -gt 36 ]; then
-    echo "  ⚠️  Data older than 36 h — investigate. Expected daily updates at 03:17 UTC."
+    echo "  ⚠️  Data older than 36 h — investigate. Expected daily updates at 12:47 UTC (18:17 IST)."
   fi
 else
   echo "  no CSV yet"

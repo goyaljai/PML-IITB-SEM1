@@ -14,10 +14,38 @@ the YAML and the defaults below.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
+from datetime import timezone, tzinfo
 from pathlib import Path
 from typing import Any
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover - Python < 3.9
+    ZoneInfo = None  # type: ignore[assignment]
+
+log = logging.getLogger("config")
+
+
+def resolve_timezone(name: str) -> tzinfo:
+    """Resolve an IANA zone name (e.g. ``Asia/Kolkata``) to a ``tzinfo``.
+
+    Falls back to UTC — never raises — so a host missing the tz database still
+    runs (it just stamps UTC). The fallback is logged so the divergence is
+    visible in the run log rather than silent.
+    """
+    if not name or name.upper() == "UTC":
+        return timezone.utc
+    if ZoneInfo is None:
+        log.warning("zoneinfo unavailable — display_timezone %r ignored, using UTC", name)
+        return timezone.utc
+    try:
+        return ZoneInfo(name)
+    except Exception as e:  # noqa: BLE001 - bad name / missing tzdata → UTC
+        log.warning("could not resolve display_timezone %r (%s) — using UTC", name, e)
+        return timezone.utc
 
 try:
     import yaml  # PyYAML
@@ -113,6 +141,17 @@ DEFAULTS: dict[str, Any] = {
     "cabin": "economy",
     "adults": 1,
     "currency": "INR",
+
+    # ── Display timezone ─────────────────────────────────────────────────────
+    # The IANA zone used to stamp human-facing columns (Scrape_Timestamp,
+    # Booking_Day_Of_Week) AND to derive the travel dates we query / record
+    # (Departure_Date, Day_of_Week, Is_Weekend_Departure). Set to the data's
+    # frame of reference — Asia/Kolkata (IST, UTC+5:30) — so timestamps read in
+    # local time WITHOUT requiring the host clock to be changed. A single
+    # resolved zone is used for both the queried date and the recorded date, so
+    # the two can never disagree across a UTC midnight boundary. Falls back to
+    # UTC if the zone name can't be resolved (missing tzdata).
+    "display_timezone": "Asia/Kolkata",
 }
 
 
@@ -154,8 +193,14 @@ class Config:
     cabin: str
     adults: int
     currency: str
+    display_timezone: str
     # Resolved at load time — the root directory of the scraper install.
     base_dir: Path = field(default_factory=lambda: Path.cwd())
+
+    @property
+    def display_tz(self) -> tzinfo:
+        """The resolved ``tzinfo`` for ``display_timezone`` (UTC on failure)."""
+        return resolve_timezone(self.display_timezone)
 
 
 def _coerce_env(raw: str, default: Any) -> Any:
@@ -240,6 +285,7 @@ def load(config_path: Path | str | None = None, base_dir: Path | None = None) ->
         cabin=str(merged["cabin"]),
         adults=int(merged["adults"]),
         currency=str(merged["currency"]),
+        display_timezone=str(merged["display_timezone"]),
         base_dir=base,
     )
 

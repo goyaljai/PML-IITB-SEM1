@@ -27,7 +27,7 @@ import logging
 import random
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 from typing import Iterable
 
@@ -78,14 +78,19 @@ def _make_row(
     run_id: str,
     cabin: str,
     currency: str,
+    tz: tzinfo,
 ) -> dict[str, object]:
     """Construct a row dict matching ``schema.CSV_HEADERS`` exactly.
 
     Passing ``flight=None`` produces a NoFlights row — the booking-context
     fields are still filled in (Schema_Version, route, dates, NoFlights tag),
     but the flight-specific fields are empty strings.
+
+    ``tz`` is the display timezone (see ``Config.display_tz``): all human-facing
+    date/time columns are stamped in it so the dataset reads in a single,
+    explicit frame of reference regardless of the host clock.
     """
-    now = datetime.now(timezone.utc).astimezone()
+    now = datetime.now(timezone.utc).astimezone(tz)
     target_date = now + timedelta(days=days_out)
     is_weekend = int(target_date.weekday() >= 5)
 
@@ -180,6 +185,7 @@ def _rows_for_search(
     run_id: str,
     cabin: str,
     currency: str,
+    tz: tzinfo,
 ) -> list[dict[str, object]]:
     """Best/Cheapest/Median (Median only if ≠ Cheapest) for a single search."""
     priced = [f for f in flights if f.price is not None]
@@ -189,7 +195,7 @@ def _rows_for_search(
         return [_make_row(
             None, origin=origin, destination=destination, days_out=days_out,
             category="NoFlights", num_results=0,
-            run_id=run_id, cabin=cabin, currency=currency,
+            run_id=run_id, cabin=cabin, currency=currency, tz=tz,
         )]
 
     best = flights[0] if flights[0].price is not None else priced[0]
@@ -199,16 +205,16 @@ def _rows_for_search(
     rows = [
         _make_row(best, origin=origin, destination=destination, days_out=days_out,
                   category="Best", num_results=num_results,
-                  run_id=run_id, cabin=cabin, currency=currency),
+                  run_id=run_id, cabin=cabin, currency=currency, tz=tz),
         _make_row(cheapest, origin=origin, destination=destination, days_out=days_out,
                   category="Cheapest", num_results=num_results,
-                  run_id=run_id, cabin=cabin, currency=currency),
+                  run_id=run_id, cabin=cabin, currency=currency, tz=tz),
     ]
     if median is not None and median.price != cheapest.price:
         rows.append(_make_row(
             median, origin=origin, destination=destination, days_out=days_out,
             category="Median", num_results=num_results,
-            run_id=run_id, cabin=cabin, currency=currency,
+            run_id=run_id, cabin=cabin, currency=currency, tz=tz,
         ))
     return rows
 
@@ -255,6 +261,12 @@ def run(
     horizons = list(days_out_override) if days_out_override is not None else list(cfg.days_out)
     summary = RunSummary()
 
+    # Resolve the display timezone ONCE so the queried travel date and the
+    # recorded Departure_Date are derived from the same clock (they used to be
+    # computed from two independent now() calls — UTC for the query, host-local
+    # for the row — which could disagree across a midnight boundary).
+    tz = cfg.display_tz
+
     total_calls = len(batch_routes) * len(horizons)
     log.info(
         "scrape begin: batch=%s/%d cycle=%d routes=%d horizons=%s total_calls=%d "
@@ -284,7 +296,7 @@ def run(
                 break
 
             summary.attempted += 1
-            target_date = (datetime.now(timezone.utc) + timedelta(days=days)).strftime("%Y-%m-%d")
+            target_date = (datetime.now(timezone.utc).astimezone(tz) + timedelta(days=days)).strftime("%Y-%m-%d")
 
             try:
                 results = adapter.search_flights(
@@ -318,7 +330,7 @@ def run(
             rows = _rows_for_search(
                 results,
                 origin=origin, destination=destination, days_out=days,
-                run_id=run_id, cabin=cfg.cabin, currency=cfg.currency,
+                run_id=run_id, cabin=cfg.cabin, currency=cfg.currency, tz=tz,
             )
 
             # Track success kind from the FIRST row (Best, Cheapest, or NoFlights).

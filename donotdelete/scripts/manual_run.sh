@@ -32,7 +32,10 @@ echo "==> upgrading fast-flights (latest)…"
 python -m pip install --quiet --upgrade fast-flights PyYAML typing_extensions || {
   echo "WARN: pip upgrade failed — continuing with current versions" >&2
 }
-python -c "import fast_flights; print('fast_flights:', getattr(fast_flights, '__version__', 'unknown'))"
+python -c "import fast_flights; from importlib.metadata import version, PackageNotFoundError
+try: v = version('fast-flights')
+except PackageNotFoundError: v = 'unknown'
+print('fast_flights:', v)"
 
 echo "==> running scraper (no auto-commit) — args: $*"
 cd "$SCRAPER_BASE" || exit 5

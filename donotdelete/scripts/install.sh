@@ -128,7 +128,7 @@ cat <<EOF
    1. Edit $SECRETS_FILE and set GH_PAT to a real token.
    2. (Optional but recommended) Run a smoke test:
         bash $SCRIPT_DIR/manual_run.sh --smoke
-   3. The scrape will run automatically at 03:17 UTC every day.
+   3. The scrape will run automatically at 12:47 UTC (= 18:17 IST) every day.
    4. Inspect logs/runs with:
         bash $SCRIPT_DIR/healthcheck.sh
 ==============================================================================

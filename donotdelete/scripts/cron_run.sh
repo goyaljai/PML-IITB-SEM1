@@ -88,7 +88,13 @@ echo "--- pip upgrade ---"
 python -m pip install --quiet --upgrade pip || echo "WARN: pip self-upgrade failed"
 python -m pip install --quiet --upgrade fast-flights PyYAML typing_extensions \
   || echo "WARN: pip upgrade failed; falling back to currently-installed version"
-python -c "import fast_flights; print('fast_flights =', getattr(fast_flights, '__version__', 'unknown'))" \
+# fast_flights does not expose __version__, so read the *installed distribution*
+# version via importlib.metadata — this is what confirms the pre-run upgrade
+# actually pulled the latest, instead of always logging "unknown".
+python -c "import fast_flights; from importlib.metadata import version, PackageNotFoundError
+try: v = version('fast-flights')
+except PackageNotFoundError: v = 'unknown'
+print('fast_flights =', v)" \
   || { echo "ERROR: fast_flights not importable (no usable version present)"; exit 5; }
 
 # ── 4) Sync repo state with origin ──────────────────────────────────────────

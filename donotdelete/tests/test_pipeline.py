@@ -124,6 +124,40 @@ def test_implausible_price_is_dropped_at_validation(fake_config):
     assert rows == []
 
 
+def test_scrape_timestamp_uses_display_timezone(fake_config):
+    """Scrape_Timestamp and Departure_Date are stamped in cfg.display_tz (IST),
+    not the host clock — and both are derived from the SAME instant.
+
+    21:00 UTC on 2026-06-18 is 02:30 IST on 2026-06-19, so an IST stamp must
+    show the 19th. This pins the timezone wiring end-to-end.
+    """
+    fake_config.display_timezone = "Asia/Kolkata"
+    fixed_utc = datetime(2026, 6, 18, 21, 0, 0, tzinfo=timezone.utc)
+
+    class _FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_utc if tz is None else fixed_utc.astimezone(tz)
+
+    flights = [_flight(7876)]
+    with mock.patch("scraper.adapter.search_flights", return_value=flights), \
+         mock.patch("scraper.pipeline.datetime", _FrozenDateTime):
+        _, out_path = pipeline.run(
+            fake_config,
+            run_id="run-tz",
+            routes_override=[("BOM", "DEL")],
+            days_out_override=[0],          # horizon 0 → Departure_Date == "today" in tz
+            sleep_fn=lambda _s: None,
+        )
+    with out_path.open() as f:
+        rows = list(csv.DictReader(f))
+    assert rows, "expected at least one row"
+    # IST local time is 2026-06-19 02:30:00 — the date rolled forward.
+    assert rows[0]["Scrape_Timestamp"].startswith("2026-06-19 02:30")
+    assert rows[0]["Departure_Date"] == "2026-06-19"
+    assert rows[0]["Booking_Day_Of_Week"] == "Friday"   # 2026-06-19 is a Friday
+
+
 def test_passes_quality_gate_logic():
     s = pipeline.RunSummary(attempted=10, with_fares=7)
     assert pipeline.passes_quality_gate(s, 0.6) is True

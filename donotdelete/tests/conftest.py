@@ -63,5 +63,6 @@ def fake_config(tmp_base: Path):
         cabin="economy",
         adults=1,
         currency="INR",
+        display_timezone="Asia/Kolkata",
         base_dir=tmp_base,
     )

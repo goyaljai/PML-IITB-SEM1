@@ -43,15 +43,19 @@ log_dir: logs
 state_dir: data
 lock_file: .lock
 
-# ── Pacing — slowed to stay under Google's IP rate-limit ────────────────────
-# Observed 2026-06-18: at 12–20 s/call the VPS IP got rate-limited after ~130
-# searches (clean start → rising "list index out of range" errors as the burst
-# continued), dragging the fare-rate toward the 0.60 gate. Slowing the request
-# rate is the direct fix (a same-IP scraper fallback would hit the same block).
-# ~30 s/call × 420 calls ≈ 3.5 h, so the budget wall is raised to 5 h to let a
-# full 70-route batch finish at the gentler pace (still well inside the daily
-# window before the next 12:47 UTC fire).
-target_runtime_seconds: 18000         # 5 h hard wall
+# ── Pacing — TIME-SLICED across the day to dodge Google's per-IP rate-limit ──
+# Observed 2026-06-18: dense bursts (12–20 s/call) got the VPS IP blocked after
+# ~130 searches (clean start → wall of "list index out of range" errors), and
+# slowing a single monolithic run did NOT help — the IP was already hot from
+# repeated same-day runs. The fix is architectural: scripts/cron_slice.sh runs
+# the day's 70-route batch as 8 slices, one every 3 h (see crontab). Each slice
+# is only ~48 calls, then the IP rests ~2.5 h — well under the threshold.
+#
+# So this budget/delay is PER SLICE, not per day:
+#   ~48 calls × ~30 s ≈ 24 min per slice; final slice (~84 calls) ≈ 42 min.
+# A 90-min hard wall leaves generous headroom yet can't bleed into the next
+# slice's 3 h window.
+target_runtime_seconds: 5400          # 90 min hard wall PER SLICE
 delay_min_seconds: 22
 delay_max_seconds: 38
 long_pause_every_routes: 8

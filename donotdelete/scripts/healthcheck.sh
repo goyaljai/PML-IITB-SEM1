@@ -65,7 +65,7 @@ if [ "${#LOGS[@]}" -eq 0 ]; then
   echo "no cron logs yet"
 else
   for L in "${LOGS[@]}"; do
-    RC=$(grep -E '^=== cron_run.sh end rc=' "$L" | tail -1 | sed -E 's/.*rc=([0-9]+).*/\1/' || echo "?")
+    RC=$(grep -E '^=== cron_(run|slice).sh end rc=' "$L" | tail -1 | sed -E 's/.*rc=([0-9]+).*/\1/' || echo "?")
     FARE=$(grep -E 'fare_rate=[0-9.]+' "$L" | tail -1 | sed -E 's/.*fare_rate=([0-9.]+).*/\1%/' || echo "?")
     ROWS=$(grep -E 'rows_written=[0-9]+' "$L" | tail -1 | sed -E 's/.*rows_written=([0-9]+).*/\1/' || echo "?")
     BUDGET=$(grep -E 'budget_hit=(True|False)' "$L" | tail -1 | sed -E 's/.*budget_hit=(True|False).*/\1/' || echo "?")
@@ -79,7 +79,7 @@ echo
 echo "── Errors / non-zero exits (last 7 days) ──────────────────────────"
 FOUND=0
 while IFS= read -r L; do
-  if grep -qE '^=== cron_run.sh end rc=[1-9]' "$L"; then
+  if grep -qE '^=== cron_(run|slice).sh end rc=[1-9]' "$L"; then
     BASE=$(basename "$L")
     LAST_ERR=$(grep -E 'ERROR|FAILED|gate trip|TIMEOUT' "$L" | tail -1)
     echo "  $BASE — ${LAST_ERR:-<no error message>}"

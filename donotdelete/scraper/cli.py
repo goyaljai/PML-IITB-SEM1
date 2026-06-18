@@ -87,7 +87,24 @@ def _argparser() -> argparse.ArgumentParser:
                    help="Cap routes to the first N (after rotation pick).")
     p.add_argument("--max-horizons", type=int, default=0,
                    help="Cap horizons to the first N.")
+    p.add_argument("--route-slice", type=str, default=None, metavar="I/N",
+                   help="Scrape only the I-th of N contiguous slices of today's "
+                        "rotation batch (1-based, e.g. 3/8). Spreads a day's batch "
+                        "across multiple cron fires to stay under the rate-limit. "
+                        "Rotation advances only on the LAST slice (I==N).")
     return p
+
+
+def _parse_route_slice(spec: str) -> tuple[int, int]:
+    """Parse ``I/N`` (e.g. ``3/8``) into (slice_index, slice_count)."""
+    try:
+        i_str, n_str = spec.split("/", 1)
+        i, n = int(i_str), int(n_str)
+    except (ValueError, AttributeError):
+        raise SystemExit(f"--route-slice must be I/N (e.g. 3/8), got {spec!r}")
+    if n < 1 or not (1 <= i <= n):
+        raise SystemExit(f"--route-slice I/N requires 1 ≤ I ≤ N and N ≥ 1, got {spec!r}")
+    return i, n
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -156,11 +173,28 @@ def main(argv: list[str] | None = None) -> int:
         # Resolve route + horizon set.
         routes_override = None
         horizons_override = None
+        # slice_is_final: True when this run is the LAST slice of a --route-slice
+        # series (I==N) and therefore the run that should advance the rotation.
+        # None means "not a slice run" (normal advance rules apply).
+        slice_is_final = None
         if args.smoke:
             batch = routes.current_batch(cfg.cities, cfg.batches, cfg.state_dir)
             routes_override = batch.routes[:1] or [cfg.canary_route]
             horizons_override = cfg.days_out[:1]
             log.info("SMOKE: 1 route × 1 horizon (no rotation advance)")
+        elif args.route_slice is not None:
+            sl_i, sl_n = _parse_route_slice(args.route_slice)
+            batch = routes.current_batch(cfg.cities, cfg.batches, cfg.state_dir)
+            routes_override = routes.batch_slice(batch.routes, sl_i, sl_n)
+            slice_is_final = (sl_i == sl_n)
+            log.info(
+                "SLICE %d/%d of batch %d/%d: %d routes (rotation advances on final slice=%s)",
+                sl_i, sl_n, batch.index + 1, cfg.batches, len(routes_override), slice_is_final,
+            )
+            if args.horizons is not None:
+                horizons_override = args.horizons
+            elif args.max_horizons and args.max_horizons > 0:
+                horizons_override = cfg.days_out[:args.max_horizons]
         else:
             if args.routes is not None:
                 routes_override = args.routes
@@ -192,8 +226,21 @@ def main(argv: list[str] | None = None) -> int:
             )
             return EXIT_GATE
 
-        # Advance rotation only on success (and not for overrides/smoke).
-        if (
+        # Advance rotation only on success.
+        # Slice runs are the exception to the "overrides never advance" rule:
+        # the FINAL slice (I==N) advances so the next day moves to the next batch,
+        # while earlier slices deliberately do not (they're the same day's batch).
+        if slice_is_final is not None:
+            if args.no_advance:
+                log.info("slice run: --no-advance set, rotation NOT advanced")
+            elif summary.budget_hit:
+                log.warning("slice run: budget hit — rotation NOT advanced")
+            elif slice_is_final:
+                new_counter = routes.advance_batch(cfg.state_dir)
+                log.info("final slice — rotation advanced → next counter=%d", new_counter)
+            else:
+                log.info("non-final slice — rotation NOT advanced (same batch continues)")
+        elif (
             not args.smoke
             and not args.no_advance
             and routes_override is None

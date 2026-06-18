@@ -64,6 +64,29 @@ def batch_for_index(
     return routes[start:end]
 
 
+def batch_slice(
+    routes: list[tuple[str, str]],
+    slice_index: int,
+    slice_count: int,
+) -> list[tuple[str, str]]:
+    """The ``slice_index``-th contiguous slice (1-based) of ``slice_count``.
+
+    Used to spread a day's batch across multiple cron fires (e.g. 8 slices,
+    one every 3 h) so the request rate stays low enough to avoid Google's
+    per-IP rate-limit. The last slice absorbs any remainder so the union of all
+    slices is exactly the input list — every route in the batch is covered once
+    per day across the slices.
+    """
+    if slice_count < 1:
+        raise ValueError("slice_count must be ≥ 1")
+    if not (1 <= slice_index <= slice_count):
+        raise ValueError(f"slice_index {slice_index} out of range [1, {slice_count}]")
+    size = len(routes) // slice_count
+    start = (slice_index - 1) * size
+    end = len(routes) if slice_index == slice_count else start + size
+    return routes[start:end]
+
+
 def current_batch(
     cities: dict[str, str],
     n_batches: int,

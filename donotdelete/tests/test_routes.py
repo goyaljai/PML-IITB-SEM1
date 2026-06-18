@@ -26,6 +26,41 @@ def test_all_routes_is_15x14():
     assert r == routes.all_routes(CITIES_15)
 
 
+def test_batch_slice_partitions_exactly():
+    """The union of all slices equals the input, in order, with no overlap."""
+    batch = routes.all_routes(CITIES_15)  # 210 routes
+    n = 8
+    reassembled = []
+    for i in range(1, n + 1):
+        reassembled.extend(routes.batch_slice(batch, i, n))
+    assert reassembled == batch  # exact partition, order preserved
+
+
+def test_batch_slice_last_absorbs_remainder():
+    batch = [("A", "B")] * 70  # 70 not divisible by 8
+    n = 8
+    sizes = [len(routes.batch_slice(batch, i, n)) for i in range(1, n + 1)]
+    assert sum(sizes) == 70
+    # First 7 slices equal-size (70//8 = 8), last absorbs remainder (70-56=14).
+    assert sizes[:-1] == [8] * 7
+    assert sizes[-1] == 14
+
+
+def test_batch_slice_single_slice_is_whole_batch():
+    batch = routes.all_routes(CITIES_15)
+    assert routes.batch_slice(batch, 1, 1) == batch
+
+
+def test_batch_slice_rejects_bad_index():
+    batch = routes.all_routes(CITIES_15)
+    with pytest.raises(ValueError):
+        routes.batch_slice(batch, 0, 8)      # below range
+    with pytest.raises(ValueError):
+        routes.batch_slice(batch, 9, 8)      # above range
+    with pytest.raises(ValueError):
+        routes.batch_slice(batch, 1, 0)      # bad count
+
+
 def test_all_routes_drops_duplicate_iata():
     """If the dict has two names mapping to the same IATA, route count is based on distinct codes."""
     dup = {"Mumbai": "BOM", "Bombay": "BOM", "Delhi": "DEL"}

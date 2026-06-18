@@ -43,16 +43,20 @@ log_dir: logs
 state_dir: data
 lock_file: .lock
 
-# ── Pacing — target ≤ 2 h per daily batch ──────────────────────────────────
-# 420 calls × ~17 s per call ≈ 119 min. The budget below is a hard wall: if
-# wall-clock crosses it, we stop, commit, and skip the rotation advance so
-# the missed slice is retried tomorrow.
-target_runtime_seconds: 7200          # 2 h
-delay_min_seconds: 12
-delay_max_seconds: 20
-long_pause_every_routes: 10
-long_pause_min_seconds: 45
-long_pause_max_seconds: 90
+# ── Pacing — slowed to stay under Google's IP rate-limit ────────────────────
+# Observed 2026-06-18: at 12–20 s/call the VPS IP got rate-limited after ~130
+# searches (clean start → rising "list index out of range" errors as the burst
+# continued), dragging the fare-rate toward the 0.60 gate. Slowing the request
+# rate is the direct fix (a same-IP scraper fallback would hit the same block).
+# ~30 s/call × 420 calls ≈ 3.5 h, so the budget wall is raised to 5 h to let a
+# full 70-route batch finish at the gentler pace (still well inside the daily
+# window before the next 12:47 UTC fire).
+target_runtime_seconds: 18000         # 5 h hard wall
+delay_min_seconds: 22
+delay_max_seconds: 38
+long_pause_every_routes: 8
+long_pause_min_seconds: 90
+long_pause_max_seconds: 180
 
 # ── Per-call retry policy ───────────────────────────────────────────────────
 max_attempts: 3

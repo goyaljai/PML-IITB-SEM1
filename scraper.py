@@ -120,6 +120,28 @@ SCRAPE_BUDGET_MIN = float(os.environ.get("SCRAPE_BUDGET_MIN", "75"))
 _src_env = os.environ.get("FLIGHT_SOURCES")
 SOURCES = build_sources(_src_env.split(",") if _src_env else None)
 
+# Per-source health, tracked across the run so source order adapts dynamically:
+# a source that keeps failing is tried later; one that recovers is tried earlier.
+# This handles mid-run health flips in EITHER direction (e.g. fast-flights leads,
+# dies at route 50, fli recovers → fli automatically gets tried first from then).
+_SRC_FAILS = {s.name: 0 for s in SOURCES}      # consecutive failures
+# After this many consecutive failures a source is "cold" and ordered last.
+SRC_TRIP_THRESHOLD = int(os.environ.get("SRC_TRIP_THRESHOLD", "3"))
+
+
+def _ordered_sources():
+    """SOURCES sorted by health: sources with fewer consecutive failures first.
+    Stable within equal health (preserves the configured fallback order)."""
+    return sorted(SOURCES, key=lambda s: min(_SRC_FAILS.get(s.name, 0), SRC_TRIP_THRESHOLD))
+
+
+def _record(name, ok):
+    """Update a source's consecutive-failure counter."""
+    if ok:
+        _SRC_FAILS[name] = 0
+    else:
+        _SRC_FAILS[name] = _SRC_FAILS.get(name, 0) + 1
+
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 def get_todays_routes():
@@ -199,7 +221,8 @@ def _search_route_multisource(src, dest, days_out):
     fares" apart from "the pipeline is broken"."""
     target_date = (datetime.now() + timedelta(days=days_out)).strftime("%Y-%m-%d")
     any_clean_empty = False  # at least one source returned cleanly (no exception)
-    for source in SOURCES:
+    # Health-ordered: recently-succeeding sources first, repeatedly-failing last.
+    for source in _ordered_sources():
         raised_every_attempt = True
         for attempt in range(1, MAX_ATTEMPTS + 1):
             try:
@@ -212,6 +235,7 @@ def _search_route_multisource(src, dest, days_out):
                         dropped = len(flights) - len(clean)
                         if dropped:
                             print(f"     [{source.name}] dropped {dropped} implausible-priced rows")
+                        _record(source.name, True)
                         return clean, source.name, False
                     # else: source returned only bogus/again-empty → fall through
             except Exception as e:  # noqa: BLE001 - try the next source, never abort
@@ -221,7 +245,8 @@ def _search_route_multisource(src, dest, days_out):
                 time.sleep(BACKOFF_SCHEDULE[attempt - 1])
         if not raised_every_attempt:
             any_clean_empty = True
-        # this source gave nothing usable — fall through to the next
+        _record(source.name, False)  # this source gave nothing usable this route
+        # fall through to the next source
     # errored = no source ever returned cleanly (all raised) → genuine outage
     return [], None, (not any_clean_empty)
 

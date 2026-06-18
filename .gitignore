@@ -30,6 +30,9 @@ donotdelete/.lock
 donotdelete/.lock.*
 donotdelete/data/.tmp_*
 donotdelete/data/*.partial
+# Rotation counter is per-VPS runtime state, not shared across machines.
+donotdelete/data/.batch_state
+donotdelete/data/.batch_state.tmp
 donotdelete/config/.env
 donotdelete/config/secrets.yaml
 donotdelete/config/*.secret
@@ -45,3 +48,6 @@ donotdelete/.venv/
 .mypy_cache/
 .ruff_cache/
 *.egg-info/
+
+# Root-level scratch venv (testing only — production venv lives outside the repo on the VPS)
+.venv/

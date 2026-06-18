@@ -1,0 +1,91 @@
+# ──────────────────────────────────────────────────────────────────────────
+# Flight scraper — production configuration.
+#
+# Every key below has a hard-coded fallback in scraper.config.DEFAULTS, so
+# missing keys here are not fatal; only the values you want to override need
+# to be set. Environment variables of the form SCRAPER_<KEY> override the
+# values here (e.g. SCRAPER_DELAY_MIN_SECONDS=14).
+#
+# ⚠️  Do NOT put credentials in this file. The cron pipeline reads any secrets
+# from $HOME/.scraper_secrets, never from the repository.
+# ──────────────────────────────────────────────────────────────────────────
+
+# ── Topology ────────────────────────────────────────────────────────────────
+# 15 Indian-domestic cities → 210 directed routes.
+cities:
+  Mumbai: BOM
+  Delhi: DEL
+  Bengaluru: BLR
+  Hyderabad: HYD
+  Chennai: MAA
+  Kolkata: CCU
+  Pune: PNQ
+  Ahmedabad: AMD
+  Surat: STV
+  Visakhapatnam: VTZ
+  Jaipur: JAI
+  Kochi: COK
+  Chandigarh: IXC
+  Indore: IDR
+  Lucknow: LKO
+
+# Booking horizons we query per route.
+days_out: [1, 3, 7, 14, 30, 60]
+
+# ── Batching ────────────────────────────────────────────────────────────────
+# 3-day rotation → 70 routes per cron run. A failed run does NOT advance the
+# counter, so the same batch is retried tomorrow.
+batches: 3
+
+# ── Paths (relative to donotdelete/) ────────────────────────────────────────
+data_dir: data
+log_dir: logs
+state_dir: data
+lock_file: .lock
+
+# ── Pacing — target ≤ 2 h per daily batch ──────────────────────────────────
+# 420 calls × ~17 s per call ≈ 119 min. The budget below is a hard wall: if
+# wall-clock crosses it, we stop, commit, and skip the rotation advance so
+# the missed slice is retried tomorrow.
+target_runtime_seconds: 7200          # 2 h
+delay_min_seconds: 12
+delay_max_seconds: 20
+long_pause_every_routes: 10
+long_pause_min_seconds: 45
+long_pause_max_seconds: 90
+
+# ── Per-call retry policy ───────────────────────────────────────────────────
+max_attempts: 3
+backoff_base_seconds: 2.0             # 2 → 4 → 8 ... bounded by backoff_max
+backoff_max_seconds: 30.0
+backoff_jitter_seconds: 1.5
+api_timeout_seconds: 30
+
+# ── Plausibility band (INR) ─────────────────────────────────────────────────
+# Anything outside is a parsing artefact — dropped at validation time. These
+# bounds bracket every Indian-domestic economy fare we've seen in years of
+# historical data.
+min_plausible_price_inr: 1000
+max_plausible_price_inr: 200000
+
+# ── Canary (startup health check) ───────────────────────────────────────────
+canary_route: [BOM, DEL]
+canary_days_out: 7
+canary_max_wait_seconds: 900          # tolerate fresh-IP warm-up
+canary_probe_interval_seconds: 30
+canary_attempts: 3
+
+# ── Post-run gate ───────────────────────────────────────────────────────────
+# Fraction of (route, horizon) attempts that must return ≥ 1 priced row. Below
+# this, the run exits with code 3 (no rotation advance, alarming a tail-eating
+# library failure or hard rate-limit before bad data is committed).
+min_success_rate: 0.60
+
+# ── Logging ─────────────────────────────────────────────────────────────────
+log_level: INFO
+log_retention_days: 30
+
+# ── Search parameters ───────────────────────────────────────────────────────
+cabin: economy
+adults: 1
+currency: INR

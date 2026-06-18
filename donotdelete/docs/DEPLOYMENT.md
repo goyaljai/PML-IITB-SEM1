@@ -10,7 +10,7 @@ this and nothing else.
 | Provider | Hostinger |
 | Host | `187.127.151.46` |
 | User | `root` (the cron lives here; pick a non-root user if you prefer — see "Non-root install") |
-| Schedule | `17 3 * * *` (03:17 UTC ≈ 08:47 IST — off-peak, single fixed hour) |
+| Schedule | `47 12 * * *` (12:47 UTC = 18:17 IST — start time inside the requested 6–7 PM IST window; scrape runs ≤ 2 h, so it finishes by ~20:17 IST) |
 | Install path | `/opt/PML-IITB-SEM1/` (any path works — every script derives its install root from `dirname $0`) |
 | Python | 3.11+ recommended (3.10 also works) |
 
@@ -61,8 +61,8 @@ bash donotdelete/scripts/manual_run.sh --smoke
 bash donotdelete/scripts/healthcheck.sh
 ```
 
-The cron entry is now in place. The next scheduled run is at 03:17 UTC the
-following day.
+The cron entry is now in place. The next scheduled run is at 12:47 UTC (=
+6:17 PM IST) on the next calendar day.
 
 ## Non-root install (optional, recommended for prod)
 

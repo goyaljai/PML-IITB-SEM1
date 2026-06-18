@@ -13,7 +13,7 @@ bash /opt/PML-IITB-SEM1/donotdelete/scripts/healthcheck.sh
 What "healthy" looks like:
   * Lock free.
   * Latest cron-*.log has `rc=0`, fare_rate ≥ 60 %, budget_hit=False.
-  * Newest CSV mtime < 36 h.
+  * Newest CSV mtime < 36 h (cron fires at 12:47 UTC = 6:17 PM IST daily).
   * No errors in the last 7 days section.
 
 ## When a run fails — symptoms → diagnosis

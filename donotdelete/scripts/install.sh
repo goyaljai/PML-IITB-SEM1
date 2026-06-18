@@ -27,7 +27,11 @@ SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 SCRAPER_BASE="$(cd "$SCRIPT_DIR/.." && pwd)"
 INSTALL_ROOT="$(cd "$SCRAPER_BASE/.." && pwd)"
 VENV="$INSTALL_ROOT/.scraper-venv"
-CRON_LINE="17 3 * * * $SCRIPT_DIR/cron_run.sh >/dev/null 2>&1"
+# Default fire time: 12:47 UTC = 18:17 IST (≈ 6:17 PM IST, inside the
+# requested 6–7 PM IST window). The minute is intentionally NOT :00/:30 to
+# avoid colliding with other people's cron jobs. Override by passing
+# `SCRAPER_CRON_LINE="47 12 * * * …"` env when invoking this installer.
+CRON_LINE="${SCRAPER_CRON_LINE:-47 12 * * * $SCRIPT_DIR/cron_run.sh >/dev/null 2>&1}"
 SECRETS_FILE="$HOME/.scraper_secrets"
 
 echo "==> install root: $INSTALL_ROOT"

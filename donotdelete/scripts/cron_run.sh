@@ -91,13 +91,37 @@ python -c "import fast_flights; print('fast_flights =', getattr(fast_flights, '_
   || { echo "ERROR: fast_flights not importable after upgrade"; exit 5; }
 
 # ── 4) Sync repo state with origin ──────────────────────────────────────────
-# Gitignored state (logs/, .batch_state, .lock) survives `reset --hard`.
+# Gitignored state (logs/, .batch_state, .lock) is never touched by git ops.
+# We DELIBERATELY avoid `git reset --hard origin/main` here: if a previous
+# cron committed locally but its push failed (exit 7 → no GH_PAT, network
+# blip, LFS quota), reset --hard would silently discard that day's commit
+# and its rows would be lost forever. Instead:
+#
+#   - Commit any leftover rows from a crashed prior run.
+#   - Fetch + rebase: keeps unpushed commits, applies any remote commits
+#     on top, autostash handles a half-written working tree.
+#   - Pull LFS objects so CSVs are real bytes, not pointer files.
 cd "$INSTALL_ROOT" || exit 5
 git config --local user.name  "goyaljai"
 git config --local user.email "goyaljai.y14@gmail.com"
 git config --local pull.rebase true
+
+# Recovery: if a prior run wrote rows but didn't reach the commit step
+# (SIGKILL, OOM), commit them now under a clearly-labelled message so the
+# rebase below sees a clean working tree.
+if [ -n "$(git status --porcelain -- donotdelete/data/ 2>/dev/null)" ]; then
+  echo "Recovering rows from prior crashed run — committing donotdelete/data/"
+  git add donotdelete/data/
+  git commit -m "data(flights): recovery commit from prior crashed run ($STAMP)" \
+    --allow-empty || true
+fi
+
 git fetch origin main --quiet || { echo "ERROR: git fetch failed"; exit 5; }
-git reset --hard origin/main --quiet
+if ! git pull --rebase --autostash origin main --quiet; then
+  echo "ERROR: rebase failed — leaving repo for manual inspection"
+  git rebase --abort 2>/dev/null || true
+  exit 5
+fi
 git lfs install --local --quiet || true
 git lfs pull --quiet || true
 

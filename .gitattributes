@@ -1,4 +1,11 @@
+# Large binary/dataset artifacts use Git LFS.
 *.db filter=lfs diff=lfs merge=lfs -text
 *.csv filter=lfs diff=lfs merge=lfs -text
 *.zip filter=lfs diff=lfs merge=lfs -text
-donotdelete/data/*.csv !text !filter !merge !diff
+
+# EXCEPTION: the flight-scraper's monthly CSVs are tiny (~8 MB/yr, ~227 B/row)
+# and append-only — plain git stores daily diffs far more cheaply than LFS
+# (which re-uploads the whole file every commit). Keep them OUT of LFS so the
+# scraper costs effectively nothing against GitHub's LFS storage/bandwidth quota.
+# Big regenerated ML CSVs elsewhere still match the *.csv rule above.
+donotdelete/data/*.csv !filter !diff !merge text

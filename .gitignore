@@ -1,18 +1,47 @@
+# ──────────────────────────────────────────────────────────────
+# PML-IITB-SEM1 — root .gitignore
+# Two bodies of work live here:
+#   - IPL Player Detection coursework (notebooks, dataset CSVs, edge detection)
+#   - Flight scraper (entirely under donotdelete/)
+# ──────────────────────────────────────────────────────────────
+
+# OS / editor noise
 .DS_Store
 .vscode/
-generate_notebook.py
-generate_final_notebook.py
-generate_comprehensive_notebook.py
-append_chapter3.py
-fix_chapter3.py
-fix_markdown.py
-generate_hog.py
+.idea/
+
+# Coursework: notebook-conversion scripts were one-off generators, not source.
+# Ignore .py at the root by default; allowlist the flight-scraper tree below.
 *.py
-!scraper.py
-!sources.py
-edge_detection/CSVs/Dataset_Features_Combined_Final.csv 
-edge_detection/CSVs/Dataset_Features_Combined_Final.csv 
-!probe_ipblock.py
-!fli_patch.py
-!probe_fli_prices.py
-!probe_success_rate.py
+!donotdelete/**/*.py
+
+# Coursework: large merged CSV is regenerable from the per-feature CSVs.
+edge_detection/CSVs/Dataset_Features_Combined_Final.csv
+
+# ── Flight scraper (donotdelete/) ───────────────────────────────
+# Runtime artefacts that must NEVER hit git:
+#   - logs grow unboundedly (kept locally on the VPS only)
+#   - the cron lock file is process-local
+#   - secrets live ONLY on the VPS in ~/.scraper_secrets (sourced by cron),
+#     never inside the repo. The lines below are a safety net in case anyone
+#     ever drops a secrets file under donotdelete/config/.
+donotdelete/logs/
+donotdelete/.lock
+donotdelete/.lock.*
+donotdelete/data/.tmp_*
+donotdelete/data/*.partial
+donotdelete/config/.env
+donotdelete/config/secrets.yaml
+donotdelete/config/*.secret
+donotdelete/scraper/__pycache__/
+donotdelete/scraper/**/__pycache__/
+donotdelete/tests/__pycache__/
+donotdelete/tests/**/__pycache__/
+donotdelete/**/*.pyc
+donotdelete/.venv/
+
+# Python build/test cruft
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/

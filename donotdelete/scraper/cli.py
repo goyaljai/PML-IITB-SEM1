@@ -219,12 +219,29 @@ def main(argv: list[str] | None = None) -> int:
             return EXIT_OTHER
 
         # Quality gate.
+        # Default (commit_below_gate=True): a degraded run still commits the
+        # valid rows it DID fetch — every written row already passed per-row
+        # validation, so partial data is good data. We only bail (EXIT_GATE)
+        # when the run produced ZERO valid rows (nothing to save, and a sign
+        # the API/IP is genuinely broken — though the canary usually catches
+        # that first). Legacy behaviour (commit_below_gate=False) bails on any
+        # below-gate run.
         if not pipeline.passes_quality_gate(summary, cfg.min_success_rate):
-            log.error(
-                "FARE-RATE GATE: %.1f%% < %.1f%% — not advancing rotation",
-                summary.fare_rate * 100, cfg.min_success_rate * 100,
-            )
-            return EXIT_GATE
+            if cfg.commit_below_gate and summary.rows_written > 0:
+                log.warning(
+                    "FARE-RATE GATE: %.1f%% < %.1f%% — DEGRADED run, but committing "
+                    "%d valid rows already fetched (commit_below_gate=True)",
+                    summary.fare_rate * 100, cfg.min_success_rate * 100,
+                    summary.rows_written,
+                )
+                # fall through to rotation/commit — do NOT return EXIT_GATE
+            else:
+                log.error(
+                    "FARE-RATE GATE: %.1f%% < %.1f%% — %s; not advancing rotation",
+                    summary.fare_rate * 100, cfg.min_success_rate * 100,
+                    "0 rows fetched" if summary.rows_written == 0 else "commit_below_gate=False",
+                )
+                return EXIT_GATE
 
         # Advance rotation only on success.
         # Slice runs are the exception to the "overrides never advance" rule:

@@ -58,6 +58,7 @@ def fake_config(tmp_base: Path):
         canary_probe_interval_seconds=0,
         canary_attempts=1,
         min_success_rate=0.5,
+        commit_below_gate=True,
         log_level="WARNING",
         log_retention_days=1,
         cabin="economy",

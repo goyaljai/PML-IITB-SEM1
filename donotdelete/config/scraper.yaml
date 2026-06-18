@@ -84,10 +84,15 @@ canary_probe_interval_seconds: 30
 canary_attempts: 3
 
 # ── Post-run gate ───────────────────────────────────────────────────────────
-# Fraction of (route, horizon) attempts that must return ≥ 1 priced row. Below
-# this, the run exits with code 3 (no rotation advance, alarming a tail-eating
-# library failure or hard rate-limit before bad data is committed).
+# Fraction of (route, horizon) attempts that must return ≥ 1 priced row.
 min_success_rate: 0.60
+# commit_below_gate=true (default): a run below the gate still commits the valid
+# rows it DID fetch (each row already passed per-row validation) and logs a
+# WARNING — partial data is kept rather than discarded. Only a run that fetched
+# ZERO valid rows exits code 3. Set false to restore the strict legacy behaviour
+# (any below-gate run exits 3 and commits nothing). The startup canary still
+# guards against a fully-broken API either way.
+commit_below_gate: true
 
 # ── Logging ─────────────────────────────────────────────────────────────────
 log_level: INFO

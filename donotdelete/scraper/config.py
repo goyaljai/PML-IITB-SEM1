@@ -129,9 +129,15 @@ DEFAULTS: dict[str, Any] = {
 
     # ── Post-run gate ───────────────────────────────────────────────────────
     # Fraction of (route, horizon) scrapes that must return ≥ 1 priced flight.
-    # If we fall below, the run exits non-zero, no data is committed, and the
-    # rotation counter does not advance.
     "min_success_rate": 0.60,
+    # When True (default): a run BELOW the gate still commits whatever valid
+    # rows it fetched (every written row already passed per-row validation —
+    # plausible price, real route, correct schema), logging a prominent WARNING
+    # instead of discarding the work. Only a run that fetched ZERO valid rows
+    # exits non-zero (EXIT_GATE). When False: legacy behaviour — below the gate
+    # the run exits EXIT_GATE and commits nothing. The startup canary still
+    # guards against a fully-broken API regardless of this setting.
+    "commit_below_gate": True,
 
     # ── Logging ─────────────────────────────────────────────────────────────
     "log_level": "INFO",                   # one of DEBUG/INFO/WARNING/ERROR
@@ -188,6 +194,7 @@ class Config:
     canary_probe_interval_seconds: float
     canary_attempts: int
     min_success_rate: float
+    commit_below_gate: bool
     log_level: str
     log_retention_days: int
     cabin: str
@@ -280,6 +287,7 @@ def load(config_path: Path | str | None = None, base_dir: Path | None = None) ->
         canary_probe_interval_seconds=float(merged["canary_probe_interval_seconds"]),
         canary_attempts=int(merged["canary_attempts"]),
         min_success_rate=float(merged["min_success_rate"]),
+        commit_below_gate=bool(merged["commit_below_gate"]),
         log_level=str(merged["log_level"]).upper(),
         log_retention_days=int(merged["log_retention_days"]),
         cabin=str(merged["cabin"]),

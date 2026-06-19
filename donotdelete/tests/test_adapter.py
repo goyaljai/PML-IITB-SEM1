@@ -316,7 +316,20 @@ def test_parser_patch_resilient_to_bad_flight():
     parser = _t.ModuleType("fast_flights.parser")
     class ResultList(list): ...
     parser.ResultList = ResultList
-    parser.parse_js = lambda js: (_ for _ in ()).throw(AssertionError("orig called"))
+
+    # The original parse_js must have SOURCE containing every fingerprint
+    # fragment, or _parser_shape_matches refuses to patch. This stub embeds the
+    # real 3.0.2 offsets in a never-executed string so inspect.getsource sees
+    # them; calling it raises (proving the patch replaced it).
+    def parse_js(js):  # noqa: ANN001
+        _shape = (
+            'js.split("data:", 1)[1].rsplit(",", 1)[0] errorHasStatus: true '
+            'payload[3][0] price = k[1][0][1] single_flight[8] single_flight[20] '
+            'single_flight[10] single_flight[21] single_flight[17] '
+            'single_flight[11] flight[22] extras[7] extras[8]'
+        )
+        raise AssertionError("original parse_js called — patch did not install")
+    parser.parse_js = parse_js
     pkg = _t.ModuleType("fast_flights")
 
     import sys as _sys
@@ -361,6 +374,50 @@ def test_parser_patch_idempotent_and_graceful(monkeypatch):
     assert adapter._PARSER_PATCHED is True
     adapter._install_parser_patch()   # idempotent second call
     adapter._PARSER_PATCHED = False   # reset for other tests
+
+
+def test_parser_shape_guard_rejects_restructured_parser():
+    """The fingerprint guard refuses to patch a parse_js that no longer matches
+    the 3.0.2 offsets we cloned — preventing silent mis-parse after an upstream
+    restructure. A function whose source lacks our markers → _parser_shape_matches
+    returns False, and _install_parser_patch leaves it untouched."""
+    from scraper import adapter
+
+    # Restructured parser: same name, totally different (shifted) offsets.
+    def parse_js(js):  # noqa: ANN001
+        price = k[9][2][4]          # NOT k[1][0][1] — shape changed
+        dep = single_flight[99]     # NOT [8]/[20]
+        return []
+    assert adapter._parser_shape_matches(parse_js) is False
+
+    # A parser carrying all fingerprint fragments in source → accepted.
+    def good(js):  # noqa: ANN001
+        _ = (
+            'js.split("data:", 1)[1].rsplit(",", 1)[0] errorHasStatus: true '
+            'payload[3][0] price = k[1][0][1] single_flight[8] single_flight[20] '
+            'single_flight[10] single_flight[21] single_flight[17] '
+            'single_flight[11] flight[22] extras[7] extras[8]'
+        )
+        return []
+    assert adapter._parser_shape_matches(good) is True
+
+
+def test_parser_shape_guard_matches_real_library_if_present():
+    """If the real fast_flights is installed in the test env, its live parse_js
+    MUST satisfy the fingerprint — otherwise our patch silently stops applying.
+    Skipped when the library isn't importable (CI without the dep)."""
+    import importlib
+    try:
+        ffparser = importlib.import_module("fast_flights.parser")
+    except Exception:  # noqa: BLE001
+        import pytest as _pytest
+        _pytest.skip("fast_flights not installed in this environment")
+    from scraper import adapter
+    fn = getattr(ffparser, "parse_js", None)
+    assert fn is not None, "fast_flights.parser.parse_js missing — patch target gone"
+    # If THIS fails, fast-flights changed its parser shape: revisit the patch
+    # AND the _PARSER_FINGERPRINT offsets before trusting collected data.
+    assert adapter._parser_shape_matches(fn) is True
 
 
 def test_backoff_called_between_attempts(fake_fast_flights):

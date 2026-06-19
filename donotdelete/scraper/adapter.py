@@ -229,18 +229,69 @@ def _normalize(row) -> NormalizedFlight:  # noqa: ANN001 - external type
 # strict superset of their behaviour: identical output on clean pages, partial
 # (instead of zero) output on pages with a bad entry.
 #
-# The patch is version-aware: it reproduces the 3.0.2 field layout. If a future
-# upgrade restructures parse_js, _install_parser_patch detects the change and
-# leaves the library untouched (we fall back to their parser, patched-bug or
-# not) rather than silently mis-parsing.
+# The patch is version-aware AND shape-verified. Before installing, it reads the
+# live ``parse_js`` SOURCE and confirms every byte-offset our resilient copy
+# depends on is still present (see _PARSER_FINGERPRINT). If a future upgrade
+# renames/moves the internals OR restructures parse_js (shifted offsets, etc.),
+# the fingerprint no longer matches and we DO NOT patch — we log a WARNING and
+# fall back to whatever the library ships, rather than silently mis-parsing with
+# stale offsets. So the patch only ever applies to a parser shaped like the
+# 3.0.2 we cloned; anything else is a loud, safe no-op.
+
+# Exact source fragments our _resilient_parse_js reproduces. Every one must
+# appear verbatim in the live parser.parse_js for the patch to be considered
+# safe to install. These are the load-bearing field offsets — if upstream
+# shifts any of them, our clone would mis-parse, so a single missing marker
+# aborts the patch.
+_PARSER_FINGERPRINT = (
+    "js.split(\"data:\", 1)[1].rsplit(\",\", 1)[0]",  # payload extraction
+    "errorHasStatus: true",                            # not-found sentinel
+    "payload[3][0]",                                   # flight list root
+    "price = k[1][0][1]",                              # THE buggy price path
+    "single_flight[8]",                                # departure_time offset
+    "single_flight[20]",                               # departure_date offset
+    "single_flight[10]",                               # arrival_time offset
+    "single_flight[21]",                               # arrival_date offset
+    "single_flight[17]",                               # plane_type offset
+    "single_flight[11]",                               # duration offset
+    "flight[22]",                                      # extras offset
+    "extras[7]",                                       # carbon emission
+    "extras[8]",                                       # typical carbon
+)
 
 _PARSER_PATCHED = False
 
 
+def _parser_shape_matches(parse_js_fn) -> bool:
+    """True iff the live parse_js source contains every offset our patch clones.
+
+    Reads the function source via ``inspect.getsource`` and checks each
+    fingerprint fragment is present verbatim. Any failure (source unavailable,
+    a marker missing) → False, so we refuse to patch a parser we don't
+    recognise instead of mis-parsing it."""
+    import inspect
+    try:
+        src = inspect.getsource(parse_js_fn)
+    except Exception as e:  # noqa: BLE001 - C-impl, stripped, or unreadable
+        log.warning("parser patch skipped: cannot read parse_js source (%s)", e)
+        return False
+    missing = [frag for frag in _PARSER_FINGERPRINT if frag not in src]
+    if missing:
+        log.warning(
+            "parser patch skipped: parse_js shape changed — %d/%d expected "
+            "offsets absent (e.g. %r). Falling back to upstream parser; "
+            "revisit the patch for this fast-flights version.",
+            len(missing), len(_PARSER_FINGERPRINT), missing[0],
+        )
+        return False
+    return True
+
+
 def _install_parser_patch() -> None:
     """Idempotently replace fast_flights.parser.parse_js with a per-flight
-    resilient version. No-op if already patched or if the library shape differs
-    from the 3.0.2 we wrote this against."""
+    resilient version — but ONLY if the live parser still matches the 3.0.2
+    shape we cloned (verified by _parser_shape_matches). No-op if already
+    patched, if the library shape differs, or if imports moved."""
     global _PARSER_PATCHED
     if _PARSER_PATCHED:
         return
@@ -254,6 +305,12 @@ def _install_parser_patch() -> None:
     except Exception as e:  # noqa: BLE001 - library not importable as expected
         log.warning("parser patch skipped (import shape changed): %s", e)
         _PARSER_PATCHED = True  # don't retry every call
+        return
+
+    # Shape gate: only patch a parser we recognise. A restructured/renamed
+    # parse_js fails this and we leave the library untouched.
+    if not getattr(_ffparser, "parse_js", None) or not _parser_shape_matches(_ffparser.parse_js):
+        _PARSER_PATCHED = True  # decided for this process; don't recheck every call
         return
 
     import json as _json

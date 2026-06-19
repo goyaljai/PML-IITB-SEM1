@@ -258,7 +258,21 @@ def test_to_datetime_on_the_hour_one_element_time():
     # Defensive: empty / short / missing payloads still degrade to None.
     assert _to_datetime(None) is None
     assert _to_datetime(_SDT(date=[2026, 7], time=[17, 0])) is None  # bad date
-    assert _to_datetime(_SDT(date=[2026, 7, 19], time=[])) == datetime(2026, 7, 19, 0, 0)
+
+
+def test_to_datetime_missing_hour_is_honest_blank():
+    """REGRESSION: fast-flights sometimes emits a garbled time where the HOUR
+    element is None (observed live: AMD->DEL IndiGo ₹4814 had time=[None, 5]).
+    We must NOT fabricate an hour by zero-filling — an unknown hour means an
+    unknown time, so _to_datetime returns None (the row keeps its real price but
+    an honest blank time) rather than inventing 00:05."""
+    from scraper.adapter import _to_datetime
+
+    assert _to_datetime(_SDT(date=[2026, 6, 26], time=[None, 5])) is None   # hour None → blank
+    assert _to_datetime(_SDT(date=[2026, 6, 26], time=[])) is None          # no time → blank
+    assert _to_datetime(_SDT(date=[2026, 6, 26], time=[None])) is None      # hour None → blank
+    # Minute None but hour present → minute defaults to 0 (still truthful).
+    assert _to_datetime(_SDT(date=[2026, 6, 26], time=[9, None])) == datetime(2026, 6, 26, 9, 0)
 
 
 def test_on_the_hour_flight_keeps_times(fake_fast_flights):

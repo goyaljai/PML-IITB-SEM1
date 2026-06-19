@@ -128,14 +128,26 @@ def _to_datetime(sdt) -> Optional[datetime]:  # noqa: ANN001 - external type
     """
     if sdt is None:
         return None
+
     try:
         date = list(sdt.date or [])
         time = list(sdt.time or [])
-        if len(date) < 3:
+        # Date must be fully present and real — a None in y/m/d can't be
+        # zero-filled into a valid calendar date, so reject the whole value.
+        if len(date) < 3 or any(x is None for x in date[:3]):
             return None
         y, m, d = int(date[0]), int(date[1]), int(date[2])
-        hh = int(time[0]) if len(time) >= 1 else 0
-        mm = int(time[1]) if len(time) >= 2 else 0
+
+        # HOUR (element 0) is the significant digit. fast-flights observed forms:
+        #   [17, 45] → 17:45      both present
+        #   [17]     → 17:00      MINUTE omitted → genuinely on the hour, fill 0
+        #   [None,5] → unknown    HOUR missing/None → we do NOT know the time;
+        #                         zero-filling to 00:05 would FABRICATE an hour,
+        #                         so return None (honest blank) instead.
+        if len(time) < 1 or time[0] is None:
+            return None
+        hh = int(time[0])
+        mm = int(time[1]) if len(time) >= 2 and time[1] is not None else 0
         return datetime(y, m, d, hh, mm)
     except Exception:  # noqa: BLE001 - normalise any malformed payload
         return None

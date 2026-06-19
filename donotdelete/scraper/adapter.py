@@ -212,6 +212,113 @@ def _normalize(row) -> NormalizedFlight:  # noqa: ANN001 - external type
     )
 
 
+# ── Resilience patch for fast-flights' own parser ───────────────────────────
+#
+# fast-flights 3.0.2 (the latest as of 2026-06-17) parses a Google Flights page
+# in a single loop over every flight on the page. One malformed flight entry
+# raises an UNGUARDED ``IndexError`` (``price = k[1][0][1]`` in their
+# parser.parse_js) that propagates out of the loop and discards the ENTIRE page
+# — every good flight on it included. Observed live as a 35–50% search loss:
+# "IndexError: list index out of range" on routes that genuinely have fares.
+#
+# We cannot edit the library file: the cron runs ``pip install --upgrade
+# fast-flights`` before every run, which would revert any in-place edit (and we
+# deliberately never pin the version). So we monkeypatch a resilient
+# ``parse_js`` at runtime that mirrors their logic but wraps EACH flight in
+# try/except — a bad entry is skipped, the rest of the page survives. This is a
+# strict superset of their behaviour: identical output on clean pages, partial
+# (instead of zero) output on pages with a bad entry.
+#
+# The patch is version-aware: it reproduces the 3.0.2 field layout. If a future
+# upgrade restructures parse_js, _install_parser_patch detects the change and
+# leaves the library untouched (we fall back to their parser, patched-bug or
+# not) rather than silently mis-parsing.
+
+_PARSER_PATCHED = False
+
+
+def _install_parser_patch() -> None:
+    """Idempotently replace fast_flights.parser.parse_js with a per-flight
+    resilient version. No-op if already patched or if the library shape differs
+    from the 3.0.2 we wrote this against."""
+    global _PARSER_PATCHED
+    if _PARSER_PATCHED:
+        return
+    try:
+        from fast_flights import parser as _ffparser
+        from fast_flights.exceptions import FlightsNotFound as _FfNotFound
+        from fast_flights.model import (
+            Airline, Airport, Alliance, CarbonEmission, Flights, JsMetadata,
+            SimpleDatetime, SingleFlight,
+        )
+    except Exception as e:  # noqa: BLE001 - library not importable as expected
+        log.warning("parser patch skipped (import shape changed): %s", e)
+        _PARSER_PATCHED = True  # don't retry every call
+        return
+
+    import json as _json
+
+    def _resilient_parse_js(js: str):
+        data = js.split("data:", 1)[1].rsplit(",", 1)[0]
+        if data.endswith("errorHasStatus: true"):
+            raise _FfNotFound("no flights found; received error")
+        payload = _json.loads(data)
+
+        alliances, airlines_meta = [], []
+        try:
+            alliances_data, airlines_data = payload[7][1][0], payload[7][1][1]
+            for code, name in alliances_data:
+                alliances.append(Alliance(code=code, name=name))
+            for code, name in airlines_data:
+                airlines_meta.append(Airline(code=code, name=name))
+        except Exception:  # noqa: BLE001 - metadata is non-essential
+            pass
+        meta = JsMetadata(alliances=alliances, airlines=airlines_meta)
+
+        flights = _ffparser.ResultList()
+        if payload[3][0] is None:
+            flights.metadata = meta
+            return flights
+
+        kept = skipped = 0
+        for k in payload[3][0]:
+            try:
+                flight = k[0]
+                price = k[1][0][1]          # the line that crashes upstream
+                typ = flight[0]
+                airlines = flight[1]
+                sg_flights = []
+                for sf in flight[2]:
+                    sg_flights.append(SingleFlight(
+                        from_airport=Airport(code=sf[3], name=sf[4]),
+                        to_airport=Airport(code=sf[6], name=sf[5]),
+                        departure=SimpleDatetime(date=sf[20], time=sf[8]),
+                        arrival=SimpleDatetime(date=sf[21], time=sf[10]),
+                        duration=sf[11],
+                        plane_type=sf[17],
+                    ))
+                extras = flight[22]
+                flights.append(Flights(
+                    type=typ, price=price, airlines=airlines, flights=sg_flights,
+                    carbon=CarbonEmission(
+                        typical_on_route=extras[8], emission=extras[7]),
+                ))
+                kept += 1
+            except Exception:  # noqa: BLE001 - skip one bad flight, keep the page
+                skipped += 1
+                continue
+
+        if skipped:
+            log.info("parser patch: kept %d flights, skipped %d malformed entry(ies)",
+                     kept, skipped)
+        flights.metadata = meta
+        return flights
+
+    _ffparser.parse_js = _resilient_parse_js
+    _PARSER_PATCHED = True
+    log.info("fast-flights parse_js patched (per-flight resilient)")
+
+
 # ── Public: search ──────────────────────────────────────────────────────────
 
 
@@ -253,6 +360,10 @@ def search_flights(
         create_filter,
         get_flights,
     )
+
+    # Make the library's page parser resilient to a single malformed flight
+    # entry (see _install_parser_patch). Idempotent; safe to call every search.
+    _install_parser_patch()
 
     if max_attempts < 1:
         raise ValueError("max_attempts must be ≥ 1")

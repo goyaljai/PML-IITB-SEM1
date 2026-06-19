@@ -291,6 +291,78 @@ def test_on_the_hour_flight_keeps_times(fake_fast_flights):
     assert n.arrival_dt == datetime(2026, 6, 25, 20, 0)
 
 
+def test_parser_patch_resilient_to_bad_flight():
+    """The monkeypatched parse_js keeps good flights when one entry is malformed.
+
+    Builds minimal stand-in fast_flights submodules (parser/exceptions/model)
+    so _install_parser_patch can install its resilient parse_js, then feeds a
+    synthetic payload with one valid flight and one whose price path
+    (k[1][0][1]) is missing — the upstream bug that discards the whole page.
+    The patched parser must return the 1 good flight, not crash."""
+    import json
+    import types as _t
+    from scraper import adapter
+
+    # ---- minimal model layer (records, just enough fields) ----
+    model = _t.ModuleType("fast_flights.model")
+    class _Rec:
+        def __init__(self, **k): self.__dict__.update(k)
+    for name in ("Airline", "Airport", "Alliance", "CarbonEmission",
+                 "Flights", "JsMetadata", "SimpleDatetime", "SingleFlight"):
+        setattr(model, name, type(name, (_Rec,), {}))
+    exc = _t.ModuleType("fast_flights.exceptions")
+    class _NF(Exception): ...
+    exc.FlightsNotFound = _NF
+    parser = _t.ModuleType("fast_flights.parser")
+    class ResultList(list): ...
+    parser.ResultList = ResultList
+    parser.parse_js = lambda js: (_ for _ in ()).throw(AssertionError("orig called"))
+    pkg = _t.ModuleType("fast_flights")
+
+    import sys as _sys
+    saved = {k: _sys.modules.get(k) for k in
+             ("fast_flights", "fast_flights.parser", "fast_flights.exceptions", "fast_flights.model")}
+    _sys.modules.update({"fast_flights": pkg, "fast_flights.parser": parser,
+                         "fast_flights.exceptions": exc, "fast_flights.model": model})
+    adapter._PARSER_PATCHED = False
+    try:
+        adapter._install_parser_patch()
+        assert parser.parse_js.__name__ == "_resilient_parse_js"
+
+        # One good flight (full path) + one bad (k[1] empty → IndexError upstream).
+        good_sf = [None, None, None, "BLR", "Bengaluru", "Indore", "IDR", None,
+                   [9, 5], None, [11, 0]] + [None] * 9 + [[2026, 6, 26], [2026, 6, 26]]
+        good_flight = ["nonstop", ["Air India"], [good_sf] ] + [None] * 19 + [[None]*9]
+        good_k = [good_flight, [[None, 7804]]]
+        bad_k = [["x", ["Y"], []], []]            # k[1][0][1] → IndexError
+        payload = [None, None, None, [[good_k, bad_k]], None, None, None,
+                   [None, [[], []]]]
+        js = "xx data:" + json.dumps(payload) + ",end"
+        out = parser.parse_js(js)
+        assert len(out) == 1                      # bad one skipped, good one kept
+        assert out[0].price == 7804
+    finally:
+        adapter._PARSER_PATCHED = False
+        for k, v in saved.items():
+            if v is None:
+                _sys.modules.pop(k, None)
+            else:
+                _sys.modules[k] = v
+
+
+def test_parser_patch_idempotent_and_graceful(monkeypatch):
+    """Patch install is idempotent and no-ops cleanly if the library is absent."""
+    import sys as _sys
+    from scraper import adapter
+    # Library not importable → graceful no-op, marks done, never raises.
+    monkeypatch.setitem(_sys.modules, "fast_flights", None)
+    adapter._PARSER_PATCHED = False
+    adapter._install_parser_patch()   # must not raise
+    assert adapter._PARSER_PATCHED is True
+    adapter._install_parser_patch()   # idempotent second call
+    adapter._PARSER_PATCHED = False   # reset for other tests
+
+
 def test_backoff_called_between_attempts(fake_fast_flights):
     """Confirm we actually sleep between attempts."""
     calls = {"n": 0}

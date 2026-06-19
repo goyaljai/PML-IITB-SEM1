@@ -240,6 +240,43 @@ def test_real_sigalrm_timeout_fires(fake_fast_flights):
     assert elapsed < 3.0, f"timeout did not fire within budget (elapsed {elapsed:.2f}s)"
 
 
+def test_to_datetime_on_the_hour_one_element_time():
+    """REGRESSION: fast-flights omits minutes for on-the-hour times, sending
+    ``time=[17]`` (5:00 PM) instead of ``time=[17, 0]``. The old strict
+    ``hh, mm = sdt.time`` unpack raised ValueError → the time silently became
+    empty, so every on-the-hour flight (often the Median row) lost its
+    Departure/Arrival time columns. We now default the missing minutes to 0."""
+    from scraper.adapter import _to_datetime
+
+    on_hour = _SDT(date=[2026, 7, 19], time=[17])      # 5:00 PM, minutes omitted
+    dt = _to_datetime(on_hour)
+    assert dt == datetime(2026, 7, 19, 17, 0)
+
+    with_min = _SDT(date=[2026, 7, 19], time=[17, 45])  # 5:45 PM, both fields
+    assert _to_datetime(with_min) == datetime(2026, 7, 19, 17, 45)
+
+    # Defensive: empty / short / missing payloads still degrade to None.
+    assert _to_datetime(None) is None
+    assert _to_datetime(_SDT(date=[2026, 7], time=[17, 0])) is None  # bad date
+    assert _to_datetime(_SDT(date=[2026, 7, 19], time=[])) == datetime(2026, 7, 19, 0, 0)
+
+
+def test_on_the_hour_flight_keeps_times(fake_fast_flights):
+    """End-to-end: an on-the-hour flight normalises with real departure/arrival
+    datetimes rather than None."""
+    f = _make_fake_flight()
+    f.flights[0].departure = _SDT(date=(2026, 6, 25), time=(17,))   # 5 PM exactly
+    f.flights[0].arrival = _SDT(date=(2026, 6, 25), time=(20,))     # 8 PM exactly
+    fake_fast_flights.get_flights = lambda _q: [f]
+    from scraper import adapter
+    [n] = adapter.search_flights(
+        origin="BOM", destination="DEL", date_str="2026-06-25",
+        max_attempts=1, sleep_fn=lambda _s: None,
+    )
+    assert n.departure_dt == datetime(2026, 6, 25, 17, 0)
+    assert n.arrival_dt == datetime(2026, 6, 25, 20, 0)
+
+
 def test_backoff_called_between_attempts(fake_fast_flights):
     """Confirm we actually sleep between attempts."""
     calls = {"n": 0}

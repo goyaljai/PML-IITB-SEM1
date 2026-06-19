@@ -115,13 +115,27 @@ def _call_timeout(seconds: int) -> Generator[None, None, None]:
 
 
 def _to_datetime(sdt) -> Optional[datetime]:  # noqa: ANN001 - external type
-    """Convert fast-flights ``SimpleDatetime`` (date=(y,m,d), time=(h,m)) to
-    a ``datetime``. Returns ``None`` if the value is missing or malformed."""
+    """Convert fast-flights ``SimpleDatetime`` (date=[y,m,d], time=[h,m]) to
+    a ``datetime``. Returns ``None`` if the value is missing or malformed.
+
+    fast-flights renders an *on-the-hour* time with the minutes omitted, so
+    ``time`` arrives as a 1-element list (e.g. ``[17]`` for 5:00 PM) instead of
+    ``[17, 0]``. A strict ``hh, mm = sdt.time`` unpack raised ValueError on
+    those, silently dropping every on-the-hour flight's Departure/Arrival times
+    (the Median row in DEL→IXC showed empty time columns while priced rows were
+    fine). We now default the missing minutes — and seconds — to 0 and tolerate
+    a short/long list rather than requiring exactly two fields.
+    """
     if sdt is None:
         return None
     try:
-        y, m, d = sdt.date
-        hh, mm = sdt.time
+        date = list(sdt.date or [])
+        time = list(sdt.time or [])
+        if len(date) < 3:
+            return None
+        y, m, d = int(date[0]), int(date[1]), int(date[2])
+        hh = int(time[0]) if len(time) >= 1 else 0
+        mm = int(time[1]) if len(time) >= 2 else 0
         return datetime(y, m, d, hh, mm)
     except Exception:  # noqa: BLE001 - normalise any malformed payload
         return None

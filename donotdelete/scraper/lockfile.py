@@ -14,7 +14,9 @@ is no PID-management or stale-lock cleanup needed.
 
 The lock file's contents are a single line of debug metadata:
 ``<pid> <iso-utc> <hostname>``. It's there for ``ps``/``ls`` ergonomics, NOT
-for ownership logic — that's the OS's job.
+for ownership logic — that's the OS's job. The breadcrumb is truncated on a
+clean release, so a NON-empty lock file when no run is active means the last
+holder died hard (``kill -9`` / OOM); an empty file is the normal idle state.
 """
 
 from __future__ import annotations
@@ -71,6 +73,15 @@ def acquire(path: Path) -> Generator[Path, None, None]:
         yield path
 
     finally:
+        # Clear the breadcrumb on clean release so an operator inspecting the
+        # file later isn't misled: a leftover breadcrumb now means the holder
+        # died hard (kill -9 / OOM, no chance to run this finally), whereas a
+        # normal exit leaves the file empty. The flock itself is kernel-managed
+        # and already released on fd close even if this truncate fails.
+        try:
+            os.ftruncate(fd, 0)
+        except OSError:
+            pass
         try:
             fcntl.flock(fd, fcntl.LOCK_UN)
         except OSError:

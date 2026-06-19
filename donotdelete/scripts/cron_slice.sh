@@ -121,11 +121,19 @@ if [ -n "$(git status --porcelain -- donotdelete/data/ 2>/dev/null)" ]; then
     --allow-empty || true
 fi
 
-git fetch origin main --quiet || { echo "ERROR: git fetch failed"; exit 5; }
-if ! git pull --rebase --autostash origin main --quiet; then
-  echo "ERROR: rebase failed — leaving repo for manual inspection"
-  git rebase --abort 2>/dev/null || true
-  exit 5
+# Pre-scrape sync is BEST-EFFORT — a GitHub hiccup must NOT block collection.
+# If fetch/rebase fails we log it and scrape anyway; step 6 re-syncs before
+# pushing (with retries), and any commit that can't push stays local and is
+# pushed by the next run's recovery path. The old version did `exit 5` here,
+# which meant a transient origin outage at cron time = a slice that collected
+# nothing. Never sacrifice collection for sync.
+if git fetch origin main --quiet; then
+  if ! git pull --rebase --autostash origin main --quiet; then
+    echo "WARN: rebase failed — aborting rebase and scraping anyway (will sync at push time)"
+    git rebase --abort 2>/dev/null || true
+  fi
+else
+  echo "WARN: git fetch failed (origin unreachable?) — scraping anyway, will retry push later"
 fi
 git lfs install --local --quiet || true
 git lfs pull --quiet || true
@@ -137,39 +145,52 @@ python -m scraper --route-slice "${SLICE_I}/${SLICE_N}"
 SCRAPE_RC=$?
 echo "--- scraper end rc=$SCRAPE_RC ---"
 
-# ── 6) Commit & push only on full success ───────────────────────────────────
-if [ "$SCRAPE_RC" -eq 0 ]; then
-  cd "$INSTALL_ROOT" || exit 5
-  git add donotdelete/data/
-  if git diff --cached --quiet; then
-    echo "No new data to commit — exiting clean"
-  else
-    DATE_TAG="$(date -u +%Y-%m-%d)"
-    git commit -m "data(flights): ${DATE_TAG} slice ${SLICE_I}/${SLICE_N} (run ${STAMP})"
-    if [ -z "${GH_PAT:-}" ]; then
-      echo "ERROR: GH_PAT not set in env — cannot push (commit is local only)"
-      exit 6
-    fi
-    PUSH_OK=0
-    for attempt in 1 2 3; do
-      if git -c credential.helper='!f() { echo "username=goyaljai"; echo "password=$GH_PAT"; }; f' \
-             push origin HEAD:main; then
-        echo "Push OK on attempt $attempt"
-        PUSH_OK=1
-        break
-      fi
-      echo "Push attempt $attempt failed — re-syncing and retrying"
-      git fetch origin main --quiet || true
-      git rebase origin/main || git rebase --abort
-      sleep $((5 * attempt))
-    done
-    if [ "$PUSH_OK" -ne 1 ]; then
-      echo "ERROR: push failed after 3 attempts"
-      exit 7
-    fi
-  fi
+# ── 6) Commit & push ANY rows that exist — driven by DATA, not exit code ─────
+# CRITICAL DESIGN RULE (do not "optimise" back to `if rc==0`):
+# We commit whatever new rows landed in donotdelete/data/ REGARDLESS of the
+# scraper's exit code. Every row written already passed per-row validation, so
+# partial/degraded output is still good data and must never be stranded on disk.
+# The old `if [ "$SCRAPE_RC" -eq 0 ]` gate meant a run that wrote 50 valid rows
+# but returned a non-zero code (e.g. fare-rate EXIT_GATE) committed NOTHING —
+# the exact "broke months ago, silently no data since" failure. Now: if there
+# are staged changes, we commit and push them, full stop. Exit code is recorded
+# for monitoring but never blocks a commit.
+cd "$INSTALL_ROOT" || exit 5
+git add donotdelete/data/
+if git diff --cached --quiet; then
+  echo "No new rows on disk to commit (scraper rc=$SCRAPE_RC) — nothing to push"
 else
-  echo "Scraper exit code $SCRAPE_RC — NOT committing"
+  NROWS_NEW=$(git diff --cached --numstat -- donotdelete/data/ | awk '{a+=$1} END{print a+0}')
+  DATE_TAG="$(date -u +%Y-%m-%d)"
+  if [ "$SCRAPE_RC" -eq 0 ]; then
+    COMMIT_MSG="data(flights): ${DATE_TAG} slice ${SLICE_I}/${SLICE_N} (run ${STAMP})"
+  else
+    # Degraded run still produced rows — commit them, flag the code in the message.
+    COMMIT_MSG="data(flights): ${DATE_TAG} slice ${SLICE_I}/${SLICE_N} DEGRADED rc=${SCRAPE_RC} (+${NROWS_NEW} rows, run ${STAMP})"
+    echo "NOTE: scraper rc=$SCRAPE_RC but ${NROWS_NEW} valid rows written — committing them anyway"
+  fi
+  git commit -m "$COMMIT_MSG"
+  if [ -z "${GH_PAT:-}" ]; then
+    echo "ERROR: GH_PAT not set in env — committed locally, cannot push (next run will push it)"
+    exit 6
+  fi
+  PUSH_OK=0
+  for attempt in 1 2 3; do
+    if git -c credential.helper='!f() { echo "username=goyaljai"; echo "password=$GH_PAT"; }; f' \
+           push origin HEAD:main; then
+      echo "Push OK on attempt $attempt"
+      PUSH_OK=1
+      break
+    fi
+    echo "Push attempt $attempt failed — re-syncing and retrying"
+    git fetch origin main --quiet || true
+    git rebase origin/main || git rebase --abort
+    sleep $((5 * attempt))
+  done
+  if [ "$PUSH_OK" -ne 1 ]; then
+    echo "ERROR: push failed after 3 attempts — commit is local, next run's sync will push it"
+    exit 7
+  fi
 fi
 
 # ── Log rotation: trim slice + legacy cron logs to last 90 days ─────────────

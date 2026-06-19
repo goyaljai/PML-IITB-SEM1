@@ -49,5 +49,9 @@ donotdelete/.venv/
 .ruff_cache/
 *.egg-info/
 
-# Root-level scratch venv (testing only — production venv lives outside the repo on the VPS)
+# Virtualenvs — scratch and the production venv that the VPS installer creates
+# at the repo root (.scraper-venv/). NEVER track these: platform-specific
+# binaries, huge, and rebuildable from requirements.
 .venv/
+.scraper-venv/
+*/.scraper-venv/

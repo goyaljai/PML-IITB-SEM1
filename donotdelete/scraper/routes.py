@@ -5,22 +5,40 @@ The route universe is ``itertools.permutations(IATA_codes, 2)`` — 15 cities ×
 14 destinations = **210 directed routes**. The rotation distributes them across
 three days so a full pass through the universe completes every 72 hours.
 
-> **Fix vs legacy v3:** the old scraper advanced the rotation counter *before*
-> the scrape ran, so a crashed run silently skipped that day's batch until the
-> next 3-day cycle. v4 separates the read from the advance:
+> **Rotation is a pure function of the UTC date — the past cannot break the
+> future.** ``batch_index = days_since_epoch % n_batches``. There is no
+> success-gated counter and no persistent state, so a degraded, failed, or
+> entirely-skipped run CANNOT starve future batches: tomorrow's batch is
+> determined solely by tomorrow's date. Every 3-day window covers all 210
+> routes regardless of what happened on any prior day.
 >
->   1. Pipeline calls ``current_batch(state_dir)`` at the start — pure read.
->   2. After a successful run, the pipeline calls ``advance_batch(state_dir)``.
->   3. On failure the counter stays put, so the next cron retries the same batch.
+> This replaced the legacy success-gated counter (advanced only on a passing
+> run). That design had a latent freeze: if the routes that landed in the
+> rotation-advancing slice were chronically broken, the counter never moved and
+> two-thirds of the universe was never collected. Decoupling rotation from
+> success removes that coupling entirely.
+>
+> UTC (not the display timezone) is deliberate: all of a day's slices fire
+> within the same UTC calendar day (00:17–21:17 UTC), so they all compute the
+> SAME ``batch_index`` and partition the same batch. Keying off IST would put
+> the late slice (21:17 UTC = 02:47 IST next day) on a different date than its
+> siblings and split the batch across two rotation indices.
 """
 
 from __future__ import annotations
 
+import datetime as _dt
 import itertools
 from dataclasses import dataclass
 from pathlib import Path
 
-# Filename for the rotation counter inside ``state_dir`` (see ``config.py``).
+# Fixed reference date for the date-based rotation. Arbitrary but immutable:
+# changing it would shift which batch a given date maps to. 2000-01-01 (a
+# Saturday) is well before any data we hold, so day_number is always positive.
+ROTATION_EPOCH = _dt.date(2000, 1, 1)
+
+# Retained for backward compatibility with any external reader; the date-based
+# rotation no longer writes or reads a counter file.
 BATCH_STATE_FILENAME = ".batch_state"
 
 
@@ -87,49 +105,52 @@ def batch_slice(
     return routes[start:end]
 
 
+def batch_index_for_date(day: _dt.date, n_batches: int) -> int:
+    """Map a calendar date to a rotation batch index — the whole rotation logic.
+
+    Pure and stateless: ``(day - ROTATION_EPOCH).days % n_batches``. Same date →
+    same index, always; consecutive dates step through 0, 1, 2, 0, 1, 2 … so the
+    full route universe is covered every ``n_batches`` days no matter what
+    happened on any prior day.
+    """
+    if n_batches < 1:
+        raise ValueError("n_batches must be ≥ 1")
+    day_number = (day - ROTATION_EPOCH).days
+    return day_number % n_batches
+
+
 def current_batch(
     cities: dict[str, str],
     n_batches: int,
-    state_dir: Path,
+    state_dir: Path,  # kept for signature stability; unused (rotation is stateless)
+    *,
+    today: _dt.date | None = None,
 ) -> Batch:
-    """Read the rotation counter and return today's batch (PURE READ — no write)."""
-    state_dir.mkdir(parents=True, exist_ok=True)
-    state_file = state_dir / BATCH_STATE_FILENAME
-    counter = 0
-    if state_file.is_file():
-        try:
-            counter = int(state_file.read_text(encoding="utf-8").strip() or "0")
-        except ValueError:
-            # Treat corrupt state as "start of the rotation" — never crash on
-            # bad state file; logging upstream notes it.
-            counter = 0
-    if counter < 0:
-        counter = 0
+    """Return today's batch as a pure function of the UTC date — no state.
+
+    ``state_dir`` is accepted for backward-compatible call sites but is no longer
+    read or written: the batch is derived from the calendar date so a failed or
+    skipped run on any prior day cannot affect which batch runs today. ``today``
+    is injectable for tests; it defaults to the current UTC date (UTC so all of
+    a day's slices agree — see module docstring).
+    """
+    day = today or _dt.datetime.now(_dt.timezone.utc).date()
     routes = all_routes(cities)
-    batch_index = counter % n_batches
+    batch_index = batch_index_for_date(day, n_batches)
+    cycle_count = (day - ROTATION_EPOCH).days // n_batches
     return Batch(
         index=batch_index,
-        cycle_count=counter // n_batches,
+        cycle_count=cycle_count,
         routes=batch_for_index(routes, batch_index, n_batches),
     )
 
 
 def advance_batch(state_dir: Path) -> int:
-    """Atomically increment the rotation counter and return the new value.
+    """No-op shim — rotation is now stateless (date-based), so there is nothing
+    to advance. Retained so existing call sites don't break; returns -1 to make
+    "rotation is not counter-driven" obvious in any log that prints the result.
 
-    Called by the pipeline ONLY after a successful run. Write is atomic via
-    rename so a kill between truncate and write can't corrupt the counter.
+    The pipeline/CLI no longer need to call this; it remains only as a guard
+    against an older caller still wired to the previous contract.
     """
-    state_dir.mkdir(parents=True, exist_ok=True)
-    state_file = state_dir / BATCH_STATE_FILENAME
-    current = 0
-    if state_file.is_file():
-        try:
-            current = int(state_file.read_text(encoding="utf-8").strip() or "0")
-        except ValueError:
-            current = 0
-    new_value = current + 1
-    tmp = state_file.with_suffix(".tmp")
-    tmp.write_text(f"{new_value}\n", encoding="utf-8")
-    tmp.replace(state_file)
-    return new_value
+    return -1

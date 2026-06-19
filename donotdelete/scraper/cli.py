@@ -78,7 +78,8 @@ def _argparser() -> argparse.ArgumentParser:
     p.add_argument("--no-canary", action="store_true",
                    help="Skip the canary (debugging / replay).")
     p.add_argument("--no-advance", action="store_true",
-                   help="Do not advance the rotation counter even on success.")
+                   help="Deprecated no-op: rotation is date-based and stateless, "
+                        "so nothing is ever 'advanced'. Accepted for compatibility.")
     p.add_argument("--routes", type=_parse_routes, default=None,
                    help="Ad-hoc routes (BOM:DEL,DEL:BOM). Overrides rotation.")
     p.add_argument("--horizons", type=_parse_horizons, default=None,
@@ -91,7 +92,8 @@ def _argparser() -> argparse.ArgumentParser:
                    help="Scrape only the I-th of N contiguous slices of today's "
                         "rotation batch (1-based, e.g. 3/8). Spreads a day's batch "
                         "across multiple cron fires to stay under the rate-limit. "
-                        "Rotation advances only on the LAST slice (I==N).")
+                        "Today's batch is fixed by the UTC date, so every slice "
+                        "agrees on the batch and no slice is special.")
     return p
 
 
@@ -173,10 +175,6 @@ def main(argv: list[str] | None = None) -> int:
         # Resolve route + horizon set.
         routes_override = None
         horizons_override = None
-        # slice_is_final: True when this run is the LAST slice of a --route-slice
-        # series (I==N) and therefore the run that should advance the rotation.
-        # None means "not a slice run" (normal advance rules apply).
-        slice_is_final = None
         if args.smoke:
             batch = routes.current_batch(cfg.cities, cfg.batches, cfg.state_dir)
             routes_override = batch.routes[:1] or [cfg.canary_route]
@@ -186,10 +184,9 @@ def main(argv: list[str] | None = None) -> int:
             sl_i, sl_n = _parse_route_slice(args.route_slice)
             batch = routes.current_batch(cfg.cities, cfg.batches, cfg.state_dir)
             routes_override = routes.batch_slice(batch.routes, sl_i, sl_n)
-            slice_is_final = (sl_i == sl_n)
             log.info(
-                "SLICE %d/%d of batch %d/%d: %d routes (rotation advances on final slice=%s)",
-                sl_i, sl_n, batch.index + 1, cfg.batches, len(routes_override), slice_is_final,
+                "SLICE %d/%d of batch %d/%d (date-based rotation): %d routes",
+                sl_i, sl_n, batch.index + 1, cfg.batches, len(routes_override),
             )
             if args.horizons is not None:
                 horizons_override = args.horizons
@@ -218,58 +215,36 @@ def main(argv: list[str] | None = None) -> int:
             log.exception("unexpected pipeline error: %s", e)
             return EXIT_OTHER
 
-        # Quality gate.
-        # Default (commit_below_gate=True): a degraded run still commits the
+        # Quality gate — a PURE HEALTH SIGNAL now; it no longer controls
+        # collection OR rotation. Rotation is date-based (see scraper.routes):
+        # the past cannot affect which batch runs in the future, so there is
+        # nothing to "advance" and nothing to withhold.
+        #
+        # commit_below_gate=True (default): a degraded run still commits the
         # valid rows it DID fetch — every written row already passed per-row
-        # validation, so partial data is good data. We only bail (EXIT_GATE)
-        # when the run produced ZERO valid rows (nothing to save, and a sign
-        # the API/IP is genuinely broken — though the canary usually catches
-        # that first). Legacy behaviour (commit_below_gate=False) bails on any
-        # below-gate run.
+        # validation, so partial data is good data. The gate only decides the
+        # EXIT CODE for monitoring: a below-gate run that fetched ZERO rows (or
+        # commit_below_gate=False) returns EXIT_GATE so the healthcheck flags it;
+        # otherwise we commit and return OK with a prominent WARNING.
         if not pipeline.passes_quality_gate(summary, cfg.min_success_rate):
             if cfg.commit_below_gate and summary.rows_written > 0:
                 log.warning(
-                    "FARE-RATE GATE: %.1f%% < %.1f%% — DEGRADED run, but committing "
-                    "%d valid rows already fetched (commit_below_gate=True)",
+                    "FARE-RATE GATE: %.1f%% < %.1f%% — DEGRADED run, committing "
+                    "%d valid rows already fetched (rotation is date-based, unaffected)",
                     summary.fare_rate * 100, cfg.min_success_rate * 100,
                     summary.rows_written,
                 )
-                # fall through to rotation/commit — do NOT return EXIT_GATE
+                # fall through — commit; rotation is stateless so nothing to do
             else:
                 log.error(
-                    "FARE-RATE GATE: %.1f%% < %.1f%% — %s; not advancing rotation",
+                    "FARE-RATE GATE: %.1f%% < %.1f%% — %s",
                     summary.fare_rate * 100, cfg.min_success_rate * 100,
                     "0 rows fetched" if summary.rows_written == 0 else "commit_below_gate=False",
                 )
                 return EXIT_GATE
 
-        # Advance rotation only on success.
-        # Slice runs are the exception to the "overrides never advance" rule:
-        # the FINAL slice (I==N) advances so the next day moves to the next batch,
-        # while earlier slices deliberately do not (they're the same day's batch).
-        if slice_is_final is not None:
-            if args.no_advance:
-                log.info("slice run: --no-advance set, rotation NOT advanced")
-            elif summary.budget_hit:
-                log.warning("slice run: budget hit — rotation NOT advanced")
-            elif slice_is_final:
-                new_counter = routes.advance_batch(cfg.state_dir)
-                log.info("final slice — rotation advanced → next counter=%d", new_counter)
-            else:
-                log.info("non-final slice — rotation NOT advanced (same batch continues)")
-        elif (
-            not args.smoke
-            and not args.no_advance
-            and routes_override is None
-            and horizons_override is None
-            and not summary.budget_hit
-        ):
-            new_counter = routes.advance_batch(cfg.state_dir)
-            log.info("rotation advanced → next counter=%d", new_counter)
-        elif summary.budget_hit:
-            log.warning("budget hit — rotation counter NOT advanced (next cron will retry)")
-        else:
-            log.info("rotation not advanced (override/smoke/no-advance)")
+        if summary.budget_hit:
+            log.warning("time budget hit — partial batch committed (date-based rotation unaffected)")
 
     log.info("run %s OK: wrote %d rows to %s", run_id, summary.rows_written, out_path)
     return EXIT_OK

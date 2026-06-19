@@ -96,45 +96,71 @@ def test_batch_for_index_validates():
         routes.batch_for_index(r, 0, 0)
 
 
-def test_current_batch_starts_at_zero_when_no_state(tmp_path):
+import datetime as _dt
+
+
+def test_batch_index_is_pure_date_function():
+    """batch_index = (date - epoch) days % n_batches — deterministic, stateless."""
+    # Epoch itself → index 0.
+    assert routes.batch_index_for_date(routes.ROTATION_EPOCH, 3) == 0
+    # Consecutive days step 0,1,2,0,1,2…
+    seq = [routes.batch_index_for_date(routes.ROTATION_EPOCH + _dt.timedelta(days=i), 3)
+           for i in range(7)]
+    assert seq == [0, 1, 2, 0, 1, 2, 0]
+    assert routes.batch_index_for_date(routes.ROTATION_EPOCH, 0 + 1) == 0  # n=1 always 0
+
+
+def test_batch_index_rejects_bad_n():
+    with pytest.raises(ValueError):
+        routes.batch_index_for_date(routes.ROTATION_EPOCH, 0)
+
+
+def test_current_batch_is_date_based(tmp_path):
+    """current_batch derives the batch from the injected date — no state file."""
+    day0 = routes.ROTATION_EPOCH               # index 0
+    day1 = routes.ROTATION_EPOCH + _dt.timedelta(days=1)  # index 1
+    b0 = routes.current_batch(CITIES_15, 3, tmp_path, today=day0)
+    b1 = routes.current_batch(CITIES_15, 3, tmp_path, today=day1)
+    assert b0.index == 0
+    assert b1.index == 1
+    assert len(b0.routes) == 70
+    # No state file is created — rotation is stateless.
+    assert not (tmp_path / routes.BATCH_STATE_FILENAME).exists()
+
+
+def test_current_batch_defaults_to_utc_today(tmp_path):
+    """With no injected date it uses UTC 'today' and returns a valid batch."""
     b = routes.current_batch(CITIES_15, 3, tmp_path)
-    assert b.index == 0
-    assert b.cycle_count == 0
+    assert 0 <= b.index < 3
     assert len(b.routes) == 70
 
 
-def test_current_batch_reads_counter(tmp_path):
-    (tmp_path / routes.BATCH_STATE_FILENAME).write_text("7", encoding="utf-8")
-    b = routes.current_batch(CITIES_15, 3, tmp_path)
-    assert b.index == 1                # 7 % 3 == 1
-    assert b.cycle_count == 7 // 3      # 2 complete cycles done
+def test_past_failure_cannot_change_future_batch(tmp_path):
+    """The core guarantee: a given date ALWAYS maps to the same batch,
+    regardless of any prior run, state file, or 'failure'. The past cannot
+    break the future."""
+    day = routes.ROTATION_EPOCH + _dt.timedelta(days=100)
+    expected = routes.current_batch(CITIES_15, 3, tmp_path, today=day).index
+    # Simulate arbitrary prior 'history' / leftover legacy state — must not matter.
+    (tmp_path / routes.BATCH_STATE_FILENAME).write_text("999", encoding="utf-8")
+    again = routes.current_batch(CITIES_15, 3, tmp_path, today=day).index
+    assert again == expected
 
 
-def test_current_batch_does_not_write(tmp_path):
-    """current_batch is a PURE READ — fixes the v3 bug."""
-    state = tmp_path / routes.BATCH_STATE_FILENAME
-    state.write_text("5", encoding="utf-8")
-    before = state.read_text(encoding="utf-8")
-    routes.current_batch(CITIES_15, 3, tmp_path)
-    assert state.read_text(encoding="utf-8") == before
+def test_three_consecutive_days_cover_universe(tmp_path):
+    """Any 3 consecutive days collect all 210 routes exactly once — guaranteed
+    no matter what happened before."""
+    start = routes.ROTATION_EPOCH + _dt.timedelta(days=500)
+    seen = []
+    for i in range(3):
+        b = routes.current_batch(CITIES_15, 3, tmp_path, today=start + _dt.timedelta(days=i))
+        seen.extend(b.routes)
+    assert sorted(seen) == sorted(routes.all_routes(CITIES_15))
+    assert len(seen) == len(set(seen))  # no dupes
 
 
-def test_current_batch_handles_corrupt_state(tmp_path):
-    (tmp_path / routes.BATCH_STATE_FILENAME).write_text("notanumber\n", encoding="utf-8")
-    b = routes.current_batch(CITIES_15, 3, tmp_path)
-    assert b.index == 0  # corrupt state → treat as 0
-
-
-def test_advance_batch_increments(tmp_path):
-    assert routes.advance_batch(tmp_path) == 1
-    assert routes.advance_batch(tmp_path) == 2
-    assert (tmp_path / routes.BATCH_STATE_FILENAME).read_text(encoding="utf-8").strip() == "2"
-
-
-def test_advance_then_current_round_trip(tmp_path):
-    routes.advance_batch(tmp_path)
-    routes.advance_batch(tmp_path)
-    routes.advance_batch(tmp_path)
-    b = routes.current_batch(CITIES_15, 3, tmp_path)
-    assert b.index == 0
-    assert b.cycle_count == 1
+def test_advance_batch_is_noop_shim(tmp_path):
+    """advance_batch no longer drives rotation; it's an inert shim returning -1
+    and writing no state."""
+    assert routes.advance_batch(tmp_path) == -1
+    assert not (tmp_path / routes.BATCH_STATE_FILENAME).exists()

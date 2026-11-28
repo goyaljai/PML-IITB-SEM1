@@ -29224,3 +29224,75 @@ Schema_Version,Scrape_Timestamp,Days_to_Departure,Departure_Date,Day_of_Week,Boo
 4,2026-11-28 09:12:04,60,2027-01-27,Wednesday,Saturday,4:10 PM,2027-01-27T16:10:00,16,8:40 PM,2027-01-27T20:40:00,0,0,BLR,BOM,IndiGo,,Airbus A321neo,165,1,GOI,105,0,91,30,35,fast-flights,Best,5146,70000,INR,economy,20261128T031705Z
 4,2026-11-28 09:12:04,60,2027-01-27,Wednesday,Saturday,4:10 PM,2027-01-27T16:10:00,16,8:40 PM,2027-01-27T20:40:00,0,0,BLR,BOM,IndiGo,,Airbus A321neo,165,1,GOI,105,0,91,30,35,fast-flights,Cheapest,5146,70000,INR,economy,20261128T031705Z
 4,2026-11-28 09:12:04,60,2027-01-27,Wednesday,Saturday,5:10 AM,2027-01-27T05:10:00,5,7:15 AM,2027-01-27T07:15:00,0,0,BLR,BOM,Air India,,Airbus A320neo,125,0,,,0,78,11,35,fast-flights,Median,6507,70000,INR,economy,20261128T031705Z
+4,2026-11-28 11:57:16,1,2026-11-29,Sunday,Saturday,,,,,,1,0,BLR,CCU,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 11:57:54,3,2026-12-01,Tuesday,Saturday,,,,,,0,0,BLR,CCU,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 11:58:41,7,2026-12-05,Saturday,Saturday,,,,,,1,0,BLR,CCU,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 11:59:22,14,2026-12-12,Saturday,Saturday,,,,,,1,0,BLR,CCU,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:00:05,30,2026-12-28,Monday,Saturday,,,,,,0,0,BLR,CCU,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:00:37,60,2027-01-27,Wednesday,Saturday,,,,,,0,0,BLR,CCU,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:01:14,1,2026-11-29,Sunday,Saturday,,,,,,1,0,BLR,COK,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:01:54,3,2026-12-01,Tuesday,Saturday,7:05 AM,2026-12-01T07:05:00,7,8:10 AM,2026-12-01T08:10:00,0,0,BLR,COK,IndiGo,,Airbus A321neo,65,0,,,0,39,-9,7,fast-flights,Best,7228,43000,INR,economy,20261128T061705Z
+4,2026-11-28 12:01:54,3,2026-12-01,Tuesday,Saturday,7:05 AM,2026-12-01T07:05:00,7,8:10 AM,2026-12-01T08:10:00,0,0,BLR,COK,IndiGo,,Airbus A321neo,65,0,,,0,39,-9,7,fast-flights,Cheapest,7228,43000,INR,economy,20261128T061705Z
+4,2026-11-28 12:01:54,3,2026-12-01,Tuesday,Saturday,6:35 PM,2026-12-01T18:35:00,18,7:40 PM,2026-12-01T19:40:00,0,0,BLR,COK,IndiGo,,Airbus A321neo,65,0,,,0,39,-9,7,fast-flights,Median,9386,43000,INR,economy,20261128T061705Z
+4,2026-11-28 12:02:36,7,2026-12-05,Saturday,Saturday,,,,,,1,0,BLR,COK,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:03:14,14,2026-12-12,Saturday,Saturday,,,,,,1,0,BLR,COK,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:03:49,30,2026-12-28,Monday,Saturday,,,,,,0,0,BLR,COK,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:04:30,60,2027-01-27,Wednesday,Saturday,,,,,,0,0,BLR,COK,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:05:10,1,2026-11-29,Sunday,Saturday,,,,,,1,0,BLR,DEL,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:05:49,3,2026-12-01,Tuesday,Saturday,5:45 PM,2026-12-01T17:45:00,17,,,0,0,BLR,DEL,Air India Express,,Boeing 737MAX 8 Passenger,240,1,GOI,170,0,171,26,36,fast-flights,Best,9525,136000,INR,economy,20261128T061705Z
+4,2026-11-28 12:05:49,3,2026-12-01,Tuesday,Saturday,5:45 PM,2026-12-01T17:45:00,17,,,0,0,BLR,DEL,Air India Express,,Boeing 737MAX 8 Passenger,240,1,GOI,170,0,171,26,36,fast-flights,Cheapest,9525,136000,INR,economy,20261128T061705Z
+4,2026-11-28 12:05:49,3,2026-12-01,Tuesday,Saturday,5:55 PM,2026-12-01T17:55:00,17,8:55 PM,2026-12-01T20:55:00,0,0,BLR,DEL,Air India,,Airbus A320neo,180,0,,,0,135,-1,36,fast-flights,Median,10028,136000,INR,economy,20261128T061705Z
+4,2026-11-28 12:06:31,7,2026-12-05,Saturday,Saturday,,,,,,1,0,BLR,DEL,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:07:08,14,2026-12-12,Saturday,Saturday,6:25 PM,2026-12-12T18:25:00,18,11:35 PM,2026-12-12T23:35:00,1,0,BLR,DEL,IndiGo,,Airbus A321neo,225,1,JAI,85,0,139,2,36,fast-flights,Best,10220,136000,INR,economy,20261128T061705Z
+4,2026-11-28 12:07:08,14,2026-12-12,Saturday,Saturday,6:25 PM,2026-12-12T18:25:00,18,11:35 PM,2026-12-12T23:35:00,1,0,BLR,DEL,IndiGo,,Airbus A321neo,225,1,JAI,85,0,139,2,36,fast-flights,Cheapest,10220,136000,INR,economy,20261128T061705Z
+4,2026-11-28 12:07:08,14,2026-12-12,Saturday,Saturday,3:45 PM,2026-12-12T15:45:00,15,6:35 PM,2026-12-12T18:35:00,1,0,BLR,DEL,IndiGo,,Airbus A321neo,170,0,,,0,116,-15,36,fast-flights,Median,11976,136000,INR,economy,20261128T061705Z
+4,2026-11-28 12:07:55,30,2026-12-28,Monday,Saturday,8:45 PM,2026-12-28T20:45:00,20,11:35 PM,2026-12-28T23:35:00,0,0,BLR,DEL,IndiGo,,Airbus A321neo,170,0,,,0,116,-15,37,fast-flights,Best,9710,136000,INR,economy,20261128T061705Z
+4,2026-11-28 12:07:55,30,2026-12-28,Monday,Saturday,8:45 PM,2026-12-28T20:45:00,20,11:35 PM,2026-12-28T23:35:00,0,0,BLR,DEL,IndiGo,,Airbus A321neo,170,0,,,0,116,-15,37,fast-flights,Cheapest,9710,136000,INR,economy,20261128T061705Z
+4,2026-11-28 12:07:55,30,2026-12-28,Monday,Saturday,2:30 PM,2026-12-28T14:30:00,14,5:20 PM,2026-12-28T17:20:00,0,0,BLR,DEL,IndiGo,,Airbus A321neo,170,0,,,0,116,-15,37,fast-flights,Median,10349,136000,INR,economy,20261128T061705Z
+4,2026-11-28 12:08:32,60,2027-01-27,Wednesday,Saturday,,,,,,0,0,BLR,DEL,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:09:16,1,2026-11-29,Sunday,Saturday,,,,,,1,0,BLR,HYD,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:09:59,3,2026-12-01,Tuesday,Saturday,,,,,,0,0,BLR,HYD,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:10:43,7,2026-12-05,Saturday,Saturday,,,,,,1,0,BLR,HYD,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:11:13,14,2026-12-12,Saturday,Saturday,7:45 PM,2026-12-12T19:45:00,19,9:20 PM,2026-12-12T21:20:00,1,0,BLR,HYD,Air India Express,,Boeing 737MAX 8 Passenger,95,0,,,0,56,17,14,fast-flights,Best,6089,48000,INR,economy,20261128T061705Z
+4,2026-11-28 12:11:13,14,2026-12-12,Saturday,Saturday,7:45 PM,2026-12-12T19:45:00,19,9:20 PM,2026-12-12T21:20:00,1,0,BLR,HYD,Air India Express,,Boeing 737MAX 8 Passenger,95,0,,,0,56,17,14,fast-flights,Cheapest,6089,48000,INR,economy,20261128T061705Z
+4,2026-11-28 12:11:13,14,2026-12-12,Saturday,Saturday,9:15 AM,2026-12-12T09:15:00,9,10:35 AM,2026-12-12T10:35:00,1,0,BLR,HYD,IndiGo,,Airbus A321neo,80,0,,,0,45,-6,14,fast-flights,Median,7975,48000,INR,economy,20261128T061705Z
+4,2026-11-28 12:11:58,30,2026-12-28,Monday,Saturday,,,,,,0,0,BLR,HYD,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:12:40,60,2027-01-27,Wednesday,Saturday,10:10 AM,2027-01-27T10:10:00,10,2:55 PM,2027-01-27T14:55:00,0,0,BLR,HYD,IndiGo,,ATR 72,135,1,TIR,150,0,68,42,18,fast-flights,Best,4873,48000,INR,economy,20261128T061705Z
+4,2026-11-28 12:12:40,60,2027-01-27,Wednesday,Saturday,10:10 AM,2027-01-27T10:10:00,10,2:55 PM,2027-01-27T14:55:00,0,0,BLR,HYD,IndiGo,,ATR 72,135,1,TIR,150,0,68,42,18,fast-flights,Cheapest,4873,48000,INR,economy,20261128T061705Z
+4,2026-11-28 12:12:40,60,2027-01-27,Wednesday,Saturday,5:50 AM,2027-01-27T05:50:00,5,7:20 AM,2027-01-27T07:20:00,0,0,BLR,HYD,Air India Express,,Boeing 737MAX 8 Passenger,90,0,,,0,54,12,18,fast-flights,Median,5454,48000,INR,economy,20261128T061705Z
+4,2026-11-28 12:13:29,1,2026-11-29,Sunday,Saturday,9:15 AM,2026-11-29T09:15:00,9,5:10 PM,2026-11-29T17:10:00,1,0,BLR,IDR,IndiGo,,Airbus A321neo,155,1,HYD,320,0,106,23,4,fast-flights,Best,10608,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:13:29,1,2026-11-29,Sunday,Saturday,9:15 AM,2026-11-29T09:15:00,9,5:10 PM,2026-11-29T17:10:00,1,0,BLR,IDR,IndiGo,,Airbus A321neo,155,1,HYD,320,0,106,23,4,fast-flights,Cheapest,10608,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:13:29,1,2026-11-29,Sunday,Saturday,2:55 PM,2026-11-29T14:55:00,14,8:55 PM,2026-11-29T20:55:00,1,0,BLR,IDR,IndiGo,,Airbus A321neo,165,1,HYD,195,0,106,23,4,fast-flights,Median,11452,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:14:06,3,2026-12-01,Tuesday,Saturday,2:55 PM,2026-12-01T14:55:00,14,8:55 PM,2026-12-01T20:55:00,0,0,BLR,IDR,IndiGo,,Airbus A321neo,165,1,HYD,195,0,104,21,2,fast-flights,Best,14659,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:14:06,3,2026-12-01,Tuesday,Saturday,2:55 PM,2026-12-01T14:55:00,14,8:55 PM,2026-12-01T20:55:00,0,0,BLR,IDR,IndiGo,,Airbus A321neo,165,1,HYD,195,0,104,21,2,fast-flights,Cheapest,14659,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:14:06,3,2026-12-01,Tuesday,Saturday,4:45 PM,2026-12-01T16:45:00,16,8:55 PM,2026-12-01T20:55:00,0,0,BLR,IDR,IndiGo,,Airbus A321neo,160,1,HYD,90,0,104,21,2,fast-flights,Median,15263,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:14:38,7,2026-12-05,Saturday,Saturday,,,,,,1,0,BLR,IDR,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:15:19,14,2026-12-12,Saturday,Saturday,,,,,,1,0,BLR,IDR,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:15:47,30,2026-12-28,Monday,Saturday,11:30 PM,2026-12-28T23:30:00,23,6:25 AM,2026-12-29T06:25:00,0,1,BLR,IDR,IndiGo,,Airbus A321neo,155,1,PNQ,260,0,108,26,4,fast-flights,Best,10271,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:15:47,30,2026-12-28,Monday,Saturday,11:30 PM,2026-12-28T23:30:00,23,6:25 AM,2026-12-29T06:25:00,0,1,BLR,IDR,IndiGo,,Airbus A321neo,155,1,PNQ,260,0,108,26,4,fast-flights,Cheapest,10271,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:15:47,30,2026-12-28,Monday,Saturday,2:55 PM,2026-12-28T14:55:00,14,8:55 PM,2026-12-28T20:55:00,0,0,BLR,IDR,IndiGo,,Airbus A321neo,165,1,HYD,195,0,104,21,4,fast-flights,Median,11525,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:16:19,60,2027-01-27,Wednesday,Saturday,4:45 PM,2027-01-27T16:45:00,16,8:55 PM,2027-01-27T20:55:00,0,0,BLR,IDR,IndiGo,,Airbus A320neo,160,1,HYD,90,0,107,24,3,fast-flights,Best,7854,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:16:19,60,2027-01-27,Wednesday,Saturday,4:45 PM,2027-01-27T16:45:00,16,8:55 PM,2027-01-27T20:55:00,0,0,BLR,IDR,IndiGo,,Airbus A320neo,160,1,HYD,90,0,107,24,3,fast-flights,Cheapest,7854,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:16:19,60,2027-01-27,Wednesday,Saturday,2:00 AM,2027-01-27T02:00:00,2,6:25 AM,2027-01-27T06:25:00,0,0,BLR,IDR,IndiGo,,Airbus A320neo,155,1,PNQ,110,0,112,30,3,fast-flights,Median,8090,86000,INR,economy,20261128T061705Z
+4,2026-11-28 12:17:04,1,2026-11-29,Sunday,Saturday,,,,,,1,0,BLR,IXC,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:17:52,3,2026-12-01,Tuesday,Saturday,,,,,,0,0,BLR,IXC,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:18:29,7,2026-12-05,Saturday,Saturday,,,,,,1,0,BLR,IXC,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:19:02,14,2026-12-12,Saturday,Saturday,,,,,,1,0,BLR,IXC,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:19:42,30,2026-12-28,Monday,Saturday,,,,,,0,0,BLR,IXC,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:20:17,60,2027-01-27,Wednesday,Saturday,,,,,,0,0,BLR,IXC,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:21:00,1,2026-11-29,Sunday,Saturday,,,,,,1,0,BLR,JAI,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:21:38,3,2026-12-01,Tuesday,Saturday,,,,,,0,0,BLR,JAI,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:22:21,7,2026-12-05,Saturday,Saturday,,,,,,1,0,BLR,JAI,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:22:58,14,2026-12-12,Saturday,Saturday,,,,,,1,0,BLR,JAI,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:23:44,30,2026-12-28,Monday,Saturday,,,,,,0,0,BLR,JAI,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:24:27,60,2027-01-27,Wednesday,Saturday,,,,,,0,0,BLR,JAI,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:25:03,1,2026-11-29,Sunday,Saturday,4:40 AM,2026-11-29T04:40:00,4,7:10 AM,2026-11-29T07:10:00,1,0,BLR,LKO,IndiGo,,Airbus A321neo,150,0,,,0,105,-5,5,fast-flights,Best,10035,111000,INR,economy,20261128T061705Z
+4,2026-11-28 12:25:03,1,2026-11-29,Sunday,Saturday,4:40 AM,2026-11-29T04:40:00,4,7:10 AM,2026-11-29T07:10:00,1,0,BLR,LKO,IndiGo,,Airbus A321neo,150,0,,,0,105,-5,5,fast-flights,Cheapest,10035,111000,INR,economy,20261128T061705Z
+4,2026-11-28 12:25:03,1,2026-11-29,Sunday,Saturday,12:25 PM,2026-11-29T12:25:00,12,3:05 PM,2026-11-29T15:05:00,1,0,BLR,LKO,Akasa Air,,Boeing 737MAX 8 Passenger,160,0,,,0,110,-1,5,fast-flights,Median,10188,111000,INR,economy,20261128T061705Z
+4,2026-11-28 12:25:48,3,2026-12-01,Tuesday,Saturday,,,,,,0,0,BLR,LKO,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:26:24,7,2026-12-05,Saturday,Saturday,,,,,,1,0,BLR,LKO,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:27:01,14,2026-12-12,Saturday,Saturday,,,,,,1,0,BLR,LKO,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:27:43,30,2026-12-28,Monday,Saturday,,,,,,0,0,BLR,LKO,,,,,,,,,,,0,fast-flights,NoFlights,,,INR,economy,20261128T061705Z
+4,2026-11-28 12:28:17,60,2027-01-27,Wednesday,Saturday,2:55 PM,2027-01-27T14:55:00,14,7:35 PM,2027-01-27T19:35:00,0,0,BLR,LKO,IndiGo,,Airbus A321neo,190,1,HYD,90,0,123,11,2,fast-flights,Best,7643,111000,INR,economy,20261128T061705Z
+4,2026-11-28 12:28:17,60,2027-01-27,Wednesday,Saturday,2:55 PM,2027-01-27T14:55:00,14,7:35 PM,2027-01-27T19:35:00,0,0,BLR,LKO,IndiGo,,Airbus A321neo,190,1,HYD,90,0,123,11,2,fast-flights,Cheapest,7643,111000,INR,economy,20261128T061705Z
+4,2026-11-28 12:28:17,60,2027-01-27,Wednesday,Saturday,4:40 AM,2027-01-27T04:40:00,4,7:10 AM,2027-01-27T07:10:00,0,0,BLR,LKO,IndiGo,,Airbus A321neo,150,0,,,0,102,-8,2,fast-flights,Median,9535,111000,INR,economy,20261128T061705Z
